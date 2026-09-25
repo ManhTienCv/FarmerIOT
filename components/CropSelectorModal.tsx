@@ -19,7 +19,6 @@ import {
   Layers,
   Trash2,
   ChevronRight,
-  TrendingUp,
 } from 'lucide-react-native';
 import { colors, radius, shadows, spacing, typography } from '@/constants/theme';
 import type { CropProfile, CropCategory } from '@/types/crop';

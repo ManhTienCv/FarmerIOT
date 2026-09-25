@@ -55,16 +55,24 @@ export function CropProvider({ children }: { children: React.ReactNode }) {
         }
 
         const pool = [...INITIAL_CROPS, ...loadedCustom];
+        let targetCrop = INITIAL_CROPS[0];
         if (savedCropId) {
           const found = pool.find((c) => c.id === savedCropId);
-          if (found) setSelectedCrop(found);
+          if (found) {
+            targetCrop = found;
+            setSelectedCrop(found);
+          }
         }
 
         if (savedStage !== null) {
-          setSelectedStageIndex(Number(savedStage) || 0);
+          const parsed = Number(savedStage);
+          const maxIdx = Math.max(0, (targetCrop.stages?.length ?? 1) - 1);
+          setSelectedStageIndex(isNaN(parsed) ? 0 : Math.min(Math.max(0, parsed), maxIdx));
         }
         if (savedDay !== null) {
-          setDayOfCropState(Number(savedDay) || 1);
+          const parsed = Number(savedDay);
+          const maxDay = targetCrop.totalDays || 30;
+          setDayOfCropState(isNaN(parsed) ? 1 : Math.min(Math.max(1, parsed), maxDay));
         }
       } catch (err) {
         console.warn('Lỗi khi nạp dữ liệu cây trồng từ Storage:', err);

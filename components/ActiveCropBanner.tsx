@@ -3,9 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import {
   Layers,
   Sparkles,
-  ChevronDown,
   Calendar,
-  Compass,
   Info,
   SlidersHorizontal,
   Plus,

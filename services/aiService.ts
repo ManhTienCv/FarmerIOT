@@ -91,6 +91,10 @@ BẮT BUỘC TRẢ VỀ ĐÚNG ĐỊNH DẠNG JSON SAU (không thêm markdown ng
 }`;
 }
 
+function cleanJsonText(raw: string): string {
+  return raw.replace(/```json/gi, '').replace(/```/g, '').trim();
+}
+
 // 1. Gọi Google Gemini API
 async function callGemini(prompt: string): Promise<AIInsight[]> {
   if (!GEMINI_API_KEY) throw new Error('Chưa có Gemini API Key');
@@ -117,7 +121,7 @@ async function callGemini(prompt: string): Promise<AIInsight[]> {
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!text) throw new Error('Không nhận được nội dung từ Gemini');
 
-  const parsed = JSON.parse(text);
+  const parsed = JSON.parse(cleanJsonText(text));
   if (Array.isArray(parsed.insights) && parsed.insights.length > 0) {
     const now = new Date().toISOString();
     return parsed.insights.map((item: any, idx: number) => ({
@@ -161,7 +165,7 @@ async function callGroq(prompt: string): Promise<AIInsight[]> {
   const text = data.choices?.[0]?.message?.content;
   if (!text) throw new Error('Không nhận được nội dung từ Groq');
 
-  const parsed = JSON.parse(text);
+  const parsed = JSON.parse(cleanJsonText(text));
   if (Array.isArray(parsed.insights) && parsed.insights.length > 0) {
     const now = new Date().toISOString();
     return parsed.insights.map((item: any, idx: number) => ({

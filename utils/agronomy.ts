@@ -17,11 +17,12 @@ export interface VPDStatusResult {
  * @returns VPD tính bằng kiloPascal (kPa)
  */
 export function calculateVPD(temp: number, relativeHumidity: number): number {
-  if (temp <= 0 || relativeHumidity <= 0) return 0.8;
+  if (temp < -20 || relativeHumidity < 0) return 0.8;
+  const safeRH = Math.min(Math.max(relativeHumidity, 0), 100);
   // Áp suất hơi bão hòa Tetens: SVP (kPa)
   const svp = 0.61078 * Math.exp((17.27 * temp) / (temp + 237.3));
   // Áp suất thâm hụt: VPD = SVP * (1 - RH / 100)
-  const vpd = svp * (1 - Math.min(Math.max(relativeHumidity, 0), 100) / 100);
+  const vpd = svp * (1 - safeRH / 100);
   return Number(Math.max(0, vpd).toFixed(2));
 }
 
@@ -40,7 +41,16 @@ export function getVPDStatus(vpd: number, targetRange?: StageThresholdRange): VP
         recommendation: 'Bật quạt thông gió, ngưng tưới phun sương để giảm ẩm.',
       };
     }
-    if (vpd >= targetRange.optimalMin && vpd <= targetRange.optimalMax) {
+    if (vpd < targetRange.optimalMin) {
+      return {
+        status: 'seedling',
+        label: 'Mát mẻ (Dưới mức tối ưu)',
+        description: 'VPD hơi thấp, khí khổng mở một phần. Phù hợp cây con hoặc thời tiết mát.',
+        color: colors.accent[500],
+        recommendation: 'Tăng nhiệt độ nhẹ hoặc thông thoáng khí trong vườn.',
+      };
+    }
+    if (vpd <= targetRange.optimalMax) {
       return {
         status: 'optimal',
         label: 'Vùng quang hợp cực đại',
@@ -49,15 +59,22 @@ export function getVPDStatus(vpd: number, targetRange?: StageThresholdRange): VP
         recommendation: 'Duy trì ổn định môi trường vườn hiện tại.',
       };
     }
-    if (vpd > targetRange.max) {
+    if (vpd <= targetRange.max) {
       return {
-        status: 'danger_high',
-        label: 'Khô hạn sinh lý',
-        description: 'VPD quá cao vượt ngưỡng chịu đựng. Khí khổng đóng tự vệ, quang hợp bị đình trệ.',
-        color: colors.danger,
-        recommendation: 'Kích hoạt phun sương hạ nhiệt và che bớt nắng gắt ngay.',
+        status: 'stress',
+        label: 'Áp lực thoát hơi nước tăng',
+        description: 'VPD hơi cao so với mức chuẩn. Tốc độ thoát hơi nước tăng nhẹ.',
+        color: colors.warning,
+        recommendation: 'Kiểm tra độ ẩm đất và che bớt nắng gắt buổi trưa.',
       };
     }
+    return {
+      status: 'danger_high',
+      label: 'Khô hạn sinh lý',
+      description: 'VPD quá cao vượt ngưỡng chịu đựng. Khí khổng đóng tự vệ, quang hợp bị đình trệ.',
+      color: colors.danger,
+      recommendation: 'Kích hoạt phun sương hạ nhiệt và che bớt nắng gắt ngay.',
+    };
   }
 
   // Thang chuẩn quốc tế mặc định

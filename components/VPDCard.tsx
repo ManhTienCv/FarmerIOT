@@ -1,6 +1,6 @@
 import React, { memo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Wind, Activity, Info, CheckCircle2, AlertTriangle, Sparkles } from 'lucide-react-native';
+import { Wind, Sparkles } from 'lucide-react-native';
 import { colors, radius, shadows, spacing, typography } from '@/constants/theme';
 import { calculateVPD, getVPDStatus } from '@/utils/agronomy';
 import { useCrop } from '@/context/CropContext';

@@ -42,6 +42,10 @@ BẮT BUỘC TRẢ VỀ ĐÚNG ĐỊNH DẠNG JSON SAU (không thêm bất kỳ 
 }`;
 }
 
+function cleanJsonText(raw: string): string {
+  return raw.replace(/```json/gi, '').replace(/```/g, '').trim();
+}
+
 // 1. Sinh bằng Google Gemini
 async function profileWithGemini(cropName: string): Promise<CropProfile> {
   if (!GEMINI_API_KEY) throw new Error('Chưa có Gemini API Key');
@@ -69,7 +73,7 @@ async function profileWithGemini(cropName: string): Promise<CropProfile> {
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!text) throw new Error('Gemini không phản hồi dữ liệu');
 
-  const parsed = JSON.parse(text);
+  const parsed = JSON.parse(cleanJsonText(text));
   return formatParsedCrop(parsed, cropName);
 }
 
@@ -102,7 +106,7 @@ async function profileWithGroq(cropName: string): Promise<CropProfile> {
   const text = data.choices?.[0]?.message?.content;
   if (!text) throw new Error('Groq không phản hồi dữ liệu');
 
-  const parsed = JSON.parse(text);
+  const parsed = JSON.parse(cleanJsonText(text));
   return formatParsedCrop(parsed, cropName);
 }
 
@@ -231,20 +235,23 @@ function buildFallbackStages(): CropStageConfig[] {
  * Hàm phân tích và tạo hồ sơ nông học tức thì cho cây bất kỳ
  */
 export async function generateCropProfileWithAI(cropName: string): Promise<CropProfile> {
+  const safeName = cropName.replace(/["\r\n\\]/g, '').trim().slice(0, 60);
+  if (!safeName) return buildFallbackProfile('Cây trồng');
+
   // Thử Gemini trước
   try {
-    return await profileWithGemini(cropName);
+    return await profileWithGemini(safeName);
   } catch (errGemini) {
     console.warn('[AI Crop Profiler] Gemini lỗi, chuyển sang Groq fallback:', errGemini);
   }
 
   // Fallback Groq
   try {
-    return await profileWithGroq(cropName);
+    return await profileWithGroq(safeName);
   } catch (errGroq) {
     console.warn('[AI Crop Profiler] Groq lỗi, dùng bộ mẫu nông học nội bộ:', errGroq);
   }
 
   // Fallback nội bộ
-  return buildFallbackProfile(cropName);
+  return buildFallbackProfile(safeName);
 }
