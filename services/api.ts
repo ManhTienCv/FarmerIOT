@@ -110,16 +110,17 @@ export async function toggleDevice(type: DeviceType, isOn: boolean): Promise<Dev
   });
 }
 
-import { analyzeAgricultureData, type AIAnalysisResult } from '@/services/aiService';
+import { analyzeAgricultureData, type AIAnalysisResult, type PrecisionCropContext } from '@/services/aiService';
 import type { OutdoorWeather } from '@/services/weather';
 
 // ---------- AI Chẩn đoán Đa Nền Tảng (Gemini -> Groq -> Local) ----------
 export async function getAIAnalysis(
   sensors?: SensorReading[],
-  weather?: OutdoorWeather
+  weather?: OutdoorWeather,
+  cropContext?: PrecisionCropContext
 ): Promise<AIAnalysisResult> {
   const currentSensors = sensors && sensors.length > 0 ? sensors : await getSensors();
-  return analyzeAgricultureData(currentSensors, weather);
+  return analyzeAgricultureData(currentSensors, weather, cropContext);
 }
 
 export async function getAIInsights(): Promise<AIInsight[]> {

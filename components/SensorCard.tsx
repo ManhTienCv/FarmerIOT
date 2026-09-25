@@ -7,12 +7,23 @@ import { sensorMeta, getSensorStatus, statusLabel, statusColor } from '@/constan
 
 interface SensorCardProps {
   reading: SensorReading;
+  optimalMin?: number;
+  optimalMax?: number;
+  cropTargetName?: string;
   onPress?: () => void;
 }
 
-function SensorCardComponent({ reading, onPress }: SensorCardProps) {
+function SensorCardComponent({
+  reading,
+  optimalMin,
+  optimalMax,
+  cropTargetName,
+  onPress,
+}: SensorCardProps) {
   const meta = sensorMeta[reading.type];
-  const status = getSensorStatus(reading.value, reading.optimalMin, reading.optimalMax);
+  const targetMin = typeof optimalMin === 'number' ? optimalMin : reading.optimalMin;
+  const targetMax = typeof optimalMax === 'number' ? optimalMax : reading.optimalMax;
+  const status = getSensorStatus(reading.value, targetMin, targetMax);
   const Icon = meta.icon;
   const scale = useSharedValue(1);
 
@@ -55,8 +66,8 @@ function SensorCardComponent({ reading, onPress }: SensorCardProps) {
 
         {(() => {
           const span = reading.max - reading.min || 1;
-          const optLeft = Math.min(Math.max(((reading.optimalMin - reading.min) / span) * 100, 0), 100);
-          const optRight = Math.min(Math.max((1 - (reading.optimalMax - reading.min) / span) * 100, 0), 100);
+          const optLeft = Math.min(Math.max(((targetMin - reading.min) / span) * 100, 0), 100);
+          const optRight = Math.min(Math.max((1 - (targetMax - reading.min) / span) * 100, 0), 100);
           const markerPos = Math.min(Math.max((reading.value - reading.min) / span, 0), 1) * 100;
 
           return (
@@ -85,7 +96,14 @@ function SensorCardComponent({ reading, onPress }: SensorCardProps) {
           );
         })()}
 
-        <Text style={styles.hint}>{meta.hint}</Text>
+        <View style={styles.footerRow}>
+          <Text style={styles.hint} numberOfLines={1}>
+            {cropTargetName ? `Chuẩn ${cropTargetName}: ` : 'Chuẩn: '}
+            <Text style={styles.hintTarget}>
+              {targetMin} - {targetMax} {meta.unit}
+            </Text>
+          </Text>
+        </View>
       </Animated.View>
     </Pressable>
   );
@@ -179,8 +197,17 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#FFFFFF',
   },
+  footerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   hint: {
     ...typography.caption,
     color: colors.textMuted,
+  },
+  hintTarget: {
+    fontFamily: 'Inter-SemiBold',
+    color: colors.primary[600],
   },
 });

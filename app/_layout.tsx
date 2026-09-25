@@ -10,6 +10,8 @@ import {
 } from '@expo-google-fonts/inter';
 import { SplashScreen } from 'expo-router';
 
+import { CropProvider } from '@/context/CropContext';
+
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
@@ -32,12 +34,12 @@ export default function RootLayout() {
   }
 
   return (
-    <>
+    <CropProvider>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="+not-found" />
       </Stack>
       <StatusBar style="dark" />
-    </>
+    </CropProvider>
   );
 }

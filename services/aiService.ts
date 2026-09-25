@@ -1,5 +1,15 @@
+// Dịch vụ Trí Tuệ Nhân Tạo Chẩn Đoán Nông Nghiệp Chính Xác (Precision Agriculture)
+// Hỗ trợ Kiến trúc Lai Ghép Dự Phòng: Google Gemini 3.6 Flash -> Groq Cloud (GPT-OSS) -> Local Heuristics
 import type { AIInsight, SensorReading } from '@/types';
+import type { CropProfile, CropStageConfig } from '@/types/crop';
 import type { OutdoorWeather } from './weather';
+
+export interface PrecisionCropContext {
+  crop: CropProfile;
+  stage: CropStageConfig;
+  dayOfCrop: number;
+  calculatedVPD: number;
+}
 
 export interface AIAnalysisResult {
   insights: AIInsight[];
@@ -12,8 +22,12 @@ export interface AIAnalysisResult {
 const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY || '';
 const GROQ_API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY || '';
 
-// Tạo System Prompt chuyên gia nông nghiệp
-function buildPrompt(sensors: SensorReading[], weather?: OutdoorWeather): string {
+// Tạo System Prompt chuyên gia nông nghiệp bám sát từng giống cây trồng & thời tiết
+function buildPrompt(
+  sensors: SensorReading[],
+  weather?: OutdoorWeather,
+  cropContext?: PrecisionCropContext
+): string {
   const sensorMap: Record<string, number> = {};
   sensors.forEach((s) => {
     sensorMap[s.type] = s.value;
@@ -28,7 +42,25 @@ function buildPrompt(sensors: SensorReading[], weather?: OutdoorWeather): string
     ? `- Thời tiết bên ngoài (${weather.locationName}): ${weather.temperature}°C, Độ ẩm: ${weather.humidity}%, ${weather.weatherDescription}, Xác suất mưa: ${weather.rainProbability}%, Gió: ${weather.windSpeed} km/h.`
     : '- Chưa có dữ liệu thời tiết ngoài trời.';
 
-  return `Bạn là một Kỹ sư Nông nghiệp Công nghệ cao (Agronomist AI).
+  let cropSection = '';
+  if (cropContext) {
+    const { crop, stage, dayOfCrop, calculatedVPD } = cropContext;
+    cropSection = `
+THÔNG TIN VỤ MÙA ĐANG CANH TÁC:
+- Cây trồng: ${crop.name} (${crop.scientificName}) - Nhóm: ${crop.category}
+- Tiến độ: Ngày ${dayOfCrop} / ${crop.totalDays} ngày tổng chu kỳ
+- Giai đoạn sinh học: ${stage.name} (${stage.daysRange})
+- Ngưỡng tối ưu chuẩn khoa học ở giai đoạn này:
+  + Nhiệt độ tối ưu: ${stage.temperature.optimalMin}°C - ${stage.temperature.optimalMax}°C (Hiện tại: ${temp}°C)
+  + Độ ẩm đất tối ưu: ${stage.soilMoisture.optimalMin}% - ${stage.soilMoisture.optimalMax}% (Hiện tại: ${soilH}%)
+  + Độ ẩm không khí tối ưu: ${stage.airHumidity.optimalMin}% - ${stage.airHumidity.optimalMax}% (Hiện tại: ${airH}%)
+  + Ánh sáng tối ưu: ${stage.light.optimalMin} - ${stage.light.optimalMax} lux (Hiện tại: ${light} lx)
+  + Chỉ số thoát hơi nước VPD tối ưu: ${stage.vpd.optimalMin} - ${stage.vpd.optimalMax} kPa (Tính toán thực tế: ${calculatedVPD} kPa)
+- Lời khuyên nông học giai đoạn này: "${stage.advisoryNote}"`;
+  }
+
+  return `Bạn là một Kỹ sư Nông nghiệp Công nghệ cao (Senior Agronomist AI) tại Việt Nam.
+
 Dữ liệu cảm biến thời gian thực tại vườn:
 - Nhiệt độ vườn: ${temp}°C
 - Độ ẩm không khí: ${airH}%
@@ -36,11 +68,13 @@ Dữ liệu cảm biến thời gian thực tại vườn:
 - Cường độ ánh sáng: ${light} lx
 Thời tiết ngoài trời:
 ${weatherContext}
+${cropSection}
 
-HÃY ĐƯA RA TỪ 2 ĐẾN 4 CHẨN ĐOÁN VÀ KHUYẾN NGHỊ CHÍNH XÁC:
-- Kết hợp sâu sắc số liệu cảm biến thực tế và điều kiện thời tiết ngoài trời.
-- Nếu độ ẩm đất thấp nhưng ngoài trời có nguy cơ mưa cao (>65%), khuyến nghị hoãn tưới để tránh ngập úng rễ.
-- Đánh giá nguy cơ nấm bệnh, rệp, thoát hơi nước, hoặc quang hợp.
+YÊU CẦU CHẨN ĐOÁN VÀ RA QUYẾT ĐỊNH NÔNG HỌC:
+1. Đánh giá trực tiếp hiện trạng vườn so với NGƯỠNG SINH HỌC CỤ THỂ của cây trồng ở giai đoạn hiện tại (KHÔNG đưa ra nhận định chung chung).
+2. Phân tích chỉ số VPD (${cropContext ? cropContext.calculatedVPD : 'tính toán'} kPa): Khí khổng đang ở vùng quang hợp cực đại hay đang chịu áp lực thoát hơi nước/đình trệ bốc hơi?
+3. Kết hợp xác suất mưa ngoài trời để đưa ra chỉ thị tưới chính xác: Nếu đất khô nhưng ngoài trời sắp mưa to (>60%), phải hướng dẫn nông dân hoãn tưới hoặc tưới cầm chừng.
+4. Đưa ra từ 2 đến 4 khuyến nghị hành động thiết thực, ngắn gọn và có tính ứng dụng cao.
 
 BẮT BUỘC TRẢ VỀ ĐÚNG ĐỊNH DẠNG JSON SAU (không thêm markdown ngoài JSON):
 {
@@ -48,9 +82,9 @@ BẮT BUỘC TRẢ VỀ ĐÚNG ĐỊNH DẠNG JSON SAU (không thêm markdown ng
     {
       "id": "1",
       "title": "Tiêu đề ngắn dưới 7 từ",
-      "description": "Giải thích nguyên nhân và hiện trạng (1-2 câu ngắn)",
+      "description": "Giải thích nguyên nhân sinh học và hiện trạng (1-2 câu ngắn)",
       "level": "danger" | "warning" | "success" | "info",
-      "confidence": 90,
+      "confidence": 92,
       "recommendation": "Khuyến nghị hành động cụ thể cho nông dân (1-2 câu)"
     }
   ]
@@ -91,7 +125,7 @@ async function callGemini(prompt: string): Promise<AIInsight[]> {
       title: String(item.title || 'Khuyến nghị Nông học'),
       description: String(item.description || ''),
       level: (['danger', 'warning', 'success', 'info'].includes(item.level) ? item.level : 'info') as any,
-      confidence: typeof item.confidence === 'number' ? item.confidence : 88,
+      confidence: typeof item.confidence === 'number' ? item.confidence : 90,
       recommendation: String(item.recommendation || ''),
       createdAt: now,
     }));
@@ -144,7 +178,11 @@ async function callGroq(prompt: string): Promise<AIInsight[]> {
 }
 
 // 3. Fallback Hệ chuyên gia Cục bộ (Khi không có mạng hoặc cả 2 AI đều lỗi)
-function getLocalHeuristicInsights(sensors: SensorReading[], weather?: OutdoorWeather): AIInsight[] {
+function getLocalHeuristicInsights(
+  sensors: SensorReading[],
+  weather?: OutdoorWeather,
+  cropContext?: PrecisionCropContext
+): AIInsight[] {
   const sensorMap: Record<string, number> = {};
   sensors.forEach((s) => {
     sensorMap[s.type] = s.value;
@@ -156,66 +194,99 @@ function getLocalHeuristicInsights(sensors: SensorReading[], weather?: OutdoorWe
   const light = sensorMap.light ?? 12000;
   const rainProb = weather?.rainProbability ?? 0;
 
+  // Lấy ngưỡng mục tiêu từ cây trồng (nếu có)
+  const soilOptMin = cropContext?.stage.soilMoisture.optimalMin ?? 60;
+  const soilOptMax = cropContext?.stage.soilMoisture.optimalMax ?? 75;
+  const tempOptMin = cropContext?.stage.temperature.optimalMin ?? 22;
+  const tempOptMax = cropContext?.stage.temperature.optimalMax ?? 28;
+  const cropName = cropContext ? `${cropContext.crop.name} (${cropContext.stage.name})` : 'cây trồng';
+
   const now = new Date().toISOString();
   const insights: AIInsight[] = [];
 
-  // Logic đất & thời tiết
-  if (soilH < 40) {
+  // Logic độ ẩm đất theo cây
+  if (soilH < soilOptMin) {
     if (rainProb >= 60) {
       insights.push({
         id: 'soil-rain-wait',
-        title: 'Đất khô nhưng ngoài trời sắp mưa',
-        description: `Độ ẩm đất hiện tại là ${soilH}%, tuy nhiên dự báo thời tiết ngoài trời có xác suất mưa ${rainProb}%.`,
+        title: 'Đất thiếu ẩm nhưng sắp có mưa',
+        description: `Độ ẩm đất ${soilH}% thấp hơn chuẩn ${cropName} (${soilOptMin}%). Tuy nhiên ngoài trời có xác suất mưa ${rainProb}%.`,
         level: 'warning',
-        confidence: 90,
-        recommendation: 'Tạm hoãn bật máy bơm tưới gốc để tận dụng nước mưa tự nhiên và tránh thối rễ.',
+        confidence: 92,
+        recommendation: 'Tạm hoãn tưới tự động để đón mưa tự nhiên, tránh thừa nước làm úng rễ.',
         createdAt: now,
       });
     } else {
       insights.push({
         id: 'soil-dry',
-        title: 'Đất đang thiếu nước nghiêm trọng',
-        description: `Độ ẩm đất chỉ đạt ${soilH}%, thấp hơn ngưỡng sinh trưởng tối thiểu (50%).`,
+        title: `Đất dưới ngưỡng chuẩn ${cropName}`,
+        description: `Độ ẩm đất chỉ đạt ${soilH}%, trong khi ${cropName} cần từ ${soilOptMin}% - ${soilOptMax}%.`,
         level: 'danger',
-        confidence: 95,
-        recommendation: 'Kích hoạt máy bơm tưới nhỏ giọt trong 5-10 phút để cấp ẩm lại cho vùng rễ.',
+        confidence: 94,
+        recommendation: 'Kích hoạt máy bơm tưới nhỏ giọt trong 5-8 phút để bù đắp ẩm vùng rễ.',
         createdAt: now,
       });
     }
-  } else if (soilH > 80) {
+  } else if (soilH > soilOptMax + 10) {
     insights.push({
       id: 'soil-wet',
-      title: 'Đất quá ẩm, nguy cơ nghẹt rễ',
-      description: `Độ ẩm đất đo được ${soilH}%, đất đang bão hòa nước gây giảm lượng oxy rễ.`,
+      title: 'Đất dư ẩm, nguy cơ nghẹt rễ',
+      description: `Độ ẩm đất đo được ${soilH}%, vượt ngưỡng tối đa (${soilOptMax}%) của ${cropName}.`,
       level: 'warning',
       confidence: 88,
-      recommendation: 'Ngừng mọi hoạt động tưới, kiểm tra rãnh thoát nước đáy chậu/luống.',
+      recommendation: 'Ngừng tưới nước, khơi thông rãnh thoát đáy chậu để rễ hô hấp.',
       createdAt: now,
     });
   }
 
-  // Logic nấm bệnh
-  if (airH > 85 && temp >= 25 && temp <= 32) {
-    insights.push({
-      id: 'disease-risk',
-      title: 'Nguy cơ bùng phát nấm mốc & thán thư',
-      description: `Nhiệt độ ${temp}°C và độ ẩm không khí ${airH}% kéo dài là môi trường tối ưu cho bào tử nấm.`,
-      level: 'danger',
-      confidence: 86,
-      recommendation: 'Bật quạt thông gió đối lưu trong 15 phút và kiểm tra bề mặt lá dưới.',
-      createdAt: now,
-    });
+  // Logic VPD & Khí khổng
+  if (cropContext) {
+    const vpd = cropContext.calculatedVPD;
+    const vpdOptMin = cropContext.stage.vpd.optimalMin;
+    const vpdOptMax = cropContext.stage.vpd.optimalMax;
+
+    if (vpd >= vpdOptMin && vpd <= vpdOptMax) {
+      insights.push({
+        id: 'vpd-optimal',
+        title: 'Khí khổng ở Vùng Quang Hợp Cực Đại',
+        description: `Chỉ số VPD đạt ${vpd} kPa, nằm chuẩn xác trong dải lý tưởng (${vpdOptMin} - ${vpdOptMax} kPa) của ${cropContext.crop.name}.`,
+        level: 'success',
+        confidence: 96,
+        recommendation: 'Môi trường hô hấp hoàn hảo, cây đang hấp thu dinh dưỡng và CO2 với tốc độ cao nhất.',
+        createdAt: now,
+      });
+    } else if (vpd < 0.4) {
+      insights.push({
+        id: 'vpd-low',
+        title: 'Đình trệ thoát hơi nước (Nguy cơ nấm)',
+        description: `VPD ${vpd} kPa quá thấp do không khí ẩm bão hòa (${airH}%). Nước đọng mặt lá dễ phát sinh nấm.`,
+        level: 'warning',
+        confidence: 87,
+        recommendation: 'Tăng cường lưu thông gió trong vườn, ngừng phun sương tạo ẩm.',
+        createdAt: now,
+      });
+    } else if (vpd > 1.4) {
+      insights.push({
+        id: 'vpd-high',
+        title: 'Áp lực bốc hơi nước cao',
+        description: `VPD ${vpd} kPa cao hơn ngưỡng (${vpdOptMax} kPa), cây có xu hướng co cụm khí khổng để tránh mất nước.`,
+        level: 'warning',
+        confidence: 89,
+        recommendation: 'Phun sương nhẹ hạ nhiệt không khí và kiểm tra độ ẩm bầu rễ.',
+        createdAt: now,
+      });
+    }
   }
 
-  // Logic ánh sáng
-  if (light < 3000) {
+  // Logic nhiệt độ
+  if (temp > tempOptMax + 3) {
     insights.push({
-      id: 'light-low',
-      title: 'Thiếu sáng quang hợp',
-      description: `Cường độ ánh sáng chỉ đạt ${light} lx, cây trồng không đạt hiệu suất tích lũy đường bột tối ưu.`,
-      level: 'info',
-      confidence: 82,
-      recommendation: 'Bật đèn LED quang hợp chuyên dụng bổ sung 2 giờ.',
+      id: 'temp-high',
+      title: `Nhiệt độ vượt chuẩn ${cropName}`,
+      description: `Nhiệt độ đo được ${temp}°C cao hơn ngưỡng thích hợp (${tempOptMax}°C).`,
+      level: 'warning',
+      confidence: 85,
+      recommendation: 'Kéo lưới lan che mát và tăng cường thông gió đối lưu.',
       createdAt: now,
     });
   }
@@ -223,11 +294,11 @@ function getLocalHeuristicInsights(sensors: SensorReading[], weather?: OutdoorWe
   if (insights.length === 0) {
     insights.push({
       id: 'all-optimal',
-      title: 'Môi trường sinh thái lý tưởng',
-      description: `Tất cả chỉ số (Nhiệt: ${temp}°C, Ẩm: ${airH}%, Đất: ${soilH}%) đều nằm trong ngưỡng vàng.`,
+      title: `Môi trường chuẩn vàng cho ${cropName}`,
+      description: `Tất cả chỉ số (Nhiệt: ${temp}°C, Ẩm KK: ${airH}%, Đất: ${soilH}%) đều đáp ứng hoàn hảo tiêu chuẩn giống.`,
       level: 'success',
-      confidence: 96,
-      recommendation: 'Duy trì chế độ chăm sóc và quan trắc định kỳ hiện tại.',
+      confidence: 95,
+      recommendation: 'Duy trì quan trắc và chế độ chăm sóc hiện tại.',
       createdAt: now,
     });
   }
@@ -238,9 +309,10 @@ function getLocalHeuristicInsights(sensors: SensorReading[], weather?: OutdoorWe
 // Hàm điều phối chính (Cascade Failover: Gemini -> Groq -> Local)
 export async function analyzeAgricultureData(
   sensors: SensorReading[],
-  weather?: OutdoorWeather
+  weather?: OutdoorWeather,
+  cropContext?: PrecisionCropContext
 ): Promise<AIAnalysisResult> {
-  const prompt = buildPrompt(sensors, weather);
+  const prompt = buildPrompt(sensors, weather, cropContext);
   const now = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
 
   // 1. Thử Gemini trước
@@ -272,7 +344,7 @@ export async function analyzeAgricultureData(
   }
 
   // 3. Fallback sang Hệ chuyên gia nông học cục bộ
-  const localInsights = getLocalHeuristicInsights(sensors, weather);
+  const localInsights = getLocalHeuristicInsights(sensors, weather, cropContext);
   return {
     insights: localInsights,
     provider: 'local',

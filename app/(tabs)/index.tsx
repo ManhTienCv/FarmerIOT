@@ -9,10 +9,14 @@ import { sensorMeta, getSensorStatus, statusLabel, statusColor } from '@/constan
 import SensorCard from '@/components/SensorCard';
 import SectionHeader from '@/components/SectionHeader';
 import MiniChart from '@/components/MiniChart';
+import ActiveCropBanner from '@/components/ActiveCropBanner';
+import VPDCard from '@/components/VPDCard';
 import { useTabVisibility } from '@/context/TabVisibilityContext';
+import { useCrop } from '@/context/CropContext';
 
 export default function DashboardScreen() {
   const { onScroll } = useTabVisibility();
+  const { selectedCrop, currentStage } = useCrop();
   const [sensors, setSensors] = useState<SensorReading[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -51,6 +55,19 @@ export default function DashboardScreen() {
   const selectedMeta = sensorMeta[selected];
   const selectedReading = sensors.find((s) => s.type === selected);
 
+  const getStageRange = (type: SensorType) => {
+    switch (type) {
+      case 'temperature':
+        return currentStage.temperature;
+      case 'airHumidity':
+        return currentStage.airHumidity;
+      case 'soilMoisture':
+        return currentStage.soilMoisture;
+      case 'light':
+        return currentStage.light;
+    }
+  };
+
   const stats = useMemo(() => {
     if (!sensors.length) return null;
     const avg = (t: SensorType) =>
@@ -63,9 +80,12 @@ export default function DashboardScreen() {
     };
   }, [sensors]);
 
-  const alerts = sensors.filter(
-    (s) => getSensorStatus(s.value, s.optimalMin, s.optimalMax) !== 'optimal',
-  );
+  const alerts = sensors.filter((s) => {
+    const range = getStageRange(s.type);
+    const optMin = range ? range.optimalMin : s.optimalMin;
+    const optMax = range ? range.optimalMax : s.optimalMax;
+    return getSensorStatus(s.value, optMin, optMax) !== 'optimal';
+  });
 
   if (loading && !sensors.length) {
     return (
@@ -107,6 +127,9 @@ export default function DashboardScreen() {
           </View>
         </View>
 
+        {/* Banner Vụ Mùa Chuyên Sâu Theo Cây Trồng */}
+        <ActiveCropBanner />
+
         {/* Quick stats */}
         {stats && (
           <View style={styles.statsRow}>
@@ -136,55 +159,80 @@ export default function DashboardScreen() {
           </View>
         )}
 
-        {/* Sensor cards grid */}
-        <SectionHeader title="Cảm biến thời gian thực" subtitle="SHT31 · BH1750 · Cảm biến đất" />
+        {/* Thẻ chỉ số VPD Bốc thoát hơi nước & Vùng quang hợp cực đại */}
+        {stats && <VPDCard temperature={stats.temp} humidity={stats.air} />}
+
+        {/* Sensor cards grid với ngưỡng động theo cây */}
+        <SectionHeader
+          title="Cảm biến thời gian thực"
+          subtitle={`Ngưỡng chuẩn tối ưu: ${selectedCrop.name} (${currentStage.name})`}
+        />
         <View style={styles.grid}>
           {sensors.map((s) => {
-            const meta = sensorMeta[s.type];
+            const range = getStageRange(s.type);
             return (
               <View key={s.type} style={styles.gridItem}>
-                <SensorCard reading={s} onPress={() => setSelected(s.type)} />
+                <SensorCard
+                  reading={s}
+                  optimalMin={range?.optimalMin}
+                  optimalMax={range?.optimalMax}
+                  cropTargetName={selectedCrop.name}
+                  onPress={() => setSelected(s.type)}
+                />
               </View>
             );
           })}
         </View>
 
         {/* Chart */}
-        {selectedReading && (
-          <>
-            <SectionHeader
-              title={`Biểu đồ ${selectedMeta.label.toLowerCase()}`}
-              subtitle="12 giờ gần nhất"
-              right={`${selectedReading.value.toFixed(selectedMeta.decimals)} ${selectedMeta.unit}`}
-            />
-            <View style={styles.chartCard}>
-              <View style={styles.chartHeader}>
-                <View style={[styles.chartIcon, { backgroundColor: selectedMeta.bg }]}>
-                  {(() => {
-                    const Icon = selectedMeta.icon;
-                    return <Icon size={18} color={selectedMeta.color} strokeWidth={2.2} />;
-                  })()}
+        {selectedReading && (() => {
+          const selectedRange = getStageRange(selectedReading.type);
+          const selOptMin = selectedRange?.optimalMin ?? selectedReading.optimalMin;
+          const selOptMax = selectedRange?.optimalMax ?? selectedReading.optimalMax;
+          const selectedStatus = getSensorStatus(selectedReading.value, selOptMin, selOptMax);
+
+          return (
+            <>
+              <SectionHeader
+                title={`Biểu đồ ${selectedMeta.label.toLowerCase()}`}
+                subtitle={`Chuẩn ${selectedCrop.name}: ${selOptMin} - ${selOptMax} ${selectedMeta.unit}`}
+                right={`${selectedReading.value.toFixed(selectedMeta.decimals)} ${selectedMeta.unit}`}
+              />
+              <View style={styles.chartCard}>
+                <View style={styles.chartHeader}>
+                  <View style={[styles.chartIcon, { backgroundColor: selectedMeta.bg }]}>
+                    {(() => {
+                      const Icon = selectedMeta.icon;
+                      return <Icon size={18} color={selectedMeta.color} strokeWidth={2.2} />;
+                    })()}
+                  </View>
+                  <Text style={styles.chartLabel}>{selectedMeta.label}</Text>
+                  <View style={[styles.chartPill, { backgroundColor: `${statusColor[selectedStatus]}22` }]}>
+                    <Text style={[styles.chartPillText, { color: statusColor[selectedStatus] }]}>
+                      {statusLabel[selectedStatus]}
+                    </Text>
+                  </View>
                 </View>
-                <Text style={styles.chartLabel}>{selectedMeta.label}</Text>
-                <View style={[styles.chartPill, { backgroundColor: `${statusColor[getSensorStatus(selectedReading.value, selectedReading.optimalMin, selectedReading.optimalMax)]}22` }]}>
-                  <Text style={[styles.chartPillText, { color: statusColor[getSensorStatus(selectedReading.value, selectedReading.optimalMin, selectedReading.optimalMax)] }]}>
-                    {statusLabel[getSensorStatus(selectedReading.value, selectedReading.optimalMin, selectedReading.optimalMax)]}
-                  </Text>
-                </View>
+                <MiniChart data={history} color={selectedMeta.color} height={140} />
               </View>
-              <MiniChart data={history} color={selectedMeta.color} height={140} />
-            </View>
-          </>
-        )}
+            </>
+          );
+        })()}
 
         {/* Alerts */}
         {alerts.length > 0 && (
           <>
-            <SectionHeader title="Cảnh báo đang hoạt động" subtitle={`${alerts.length} thông số vượt ngưỡng`} />
+            <SectionHeader
+              title="Cảnh báo đang hoạt động"
+              subtitle={`${alerts.length} thông số lệch chuẩn ${selectedCrop.name} (${currentStage.name})`}
+            />
             <View style={styles.alertsWrap}>
               {alerts.map((s) => {
                 const meta = sensorMeta[s.type];
-                const status = getSensorStatus(s.value, s.optimalMin, s.optimalMax);
+                const range = getStageRange(s.type);
+                const optMin = range ? range.optimalMin : s.optimalMin;
+                const optMax = range ? range.optimalMax : s.optimalMax;
+                const status = getSensorStatus(s.value, optMin, optMax);
                 const Icon = meta.icon;
                 return (
                   <View key={s.type} style={[styles.alertItem, { borderLeftColor: statusColor[status] }]}>
@@ -195,8 +243,8 @@ export default function DashboardScreen() {
                       <Text style={styles.alertTitle}>{meta.label}</Text>
                       <Text style={styles.alertDesc}>
                         {status === 'low'
-                          ? `Thấp: ${s.value.toFixed(meta.decimals)}${meta.unit} (tối ưu ${s.optimalMin}–${s.optimalMax})`
-                          : `Cao: ${s.value.toFixed(meta.decimals)}${meta.unit} (tối ưu ${s.optimalMin}–${s.optimalMax})`}
+                          ? `Thấp: ${s.value.toFixed(meta.decimals)}${meta.unit} (chuẩn ${selectedCrop.name}: ${optMin}–${optMax})`
+                          : `Cao: ${s.value.toFixed(meta.decimals)}${meta.unit} (chuẩn ${selectedCrop.name}: ${optMin}–${optMax})`}
                       </Text>
                     </View>
                   </View>

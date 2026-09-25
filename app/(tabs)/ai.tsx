@@ -25,10 +25,17 @@ import { getOutdoorWeather, type OutdoorWeather } from '@/services/weather';
 import InsightCard from '@/components/InsightCard';
 import SectionHeader from '@/components/SectionHeader';
 import WeatherWidget from '@/components/WeatherWidget';
+import ActiveCropBanner from '@/components/ActiveCropBanner';
+import VPDCard from '@/components/VPDCard';
 import { useTabVisibility } from '@/context/TabVisibilityContext';
+import { useCrop } from '@/context/CropContext';
+import { calculateVPD } from '@/utils/agronomy';
+import type { SensorReading } from '@/types';
 
 export default function AIScreen() {
   const { onScroll } = useTabVisibility();
+  const { selectedCrop, currentStage, dayOfCrop } = useCrop();
+  const [sensors, setSensors] = useState<SensorReading[]>([]);
   const [insights, setInsights] = useState<AIInsight[]>([]);
   const [weather, setWeather] = useState<OutdoorWeather | null>(null);
   const [loading, setLoading] = useState(true);
@@ -56,10 +63,22 @@ export default function AIScreen() {
         getOutdoorWeather().catch(() => null),
       ]);
 
+      if (sensorData && sensorData.length > 0) setSensors(sensorData);
       if (weatherData) setWeather(weatherData);
 
-      // 2. Chạy phân tích AI lai ghép (Gemini -> Groq -> Local Heuristics)
-      const analysis = await getAIAnalysis(sensorData, weatherData || undefined);
+      const temp = sensorData.find((s) => s.type === 'temperature')?.value ?? 28;
+      const airH = sensorData.find((s) => s.type === 'airHumidity')?.value ?? 75;
+      const vpd = calculateVPD(temp, airH);
+
+      const precisionContext = {
+        crop: selectedCrop,
+        stage: currentStage,
+        dayOfCrop,
+        calculatedVPD: vpd,
+      };
+
+      // 2. Chạy phân tích AI lai ghép (Gemini -> Groq -> Local Heuristics) kết hợp bối cảnh cây trồng
+      const analysis = await getAIAnalysis(sensorData, weatherData || undefined, precisionContext);
       setInsights(analysis.insights);
       setProviderInfo({
         provider: analysis.provider,
@@ -73,11 +92,14 @@ export default function AIScreen() {
       setRefreshing(false);
       setAnalyzing(false);
     }
-  }, []);
+  }, [selectedCrop, currentStage, dayOfCrop]);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  const currentTemp = sensors.find((s) => s.type === 'temperature')?.value ?? 28;
+  const currentHumidity = sensors.find((s) => s.type === 'airHumidity')?.value ?? 75;
 
   const dangerCount = insights.filter((i) => i.level === 'danger').length;
   const warningCount = insights.filter((i) => i.level === 'warning').length;
@@ -159,7 +181,13 @@ export default function AIScreen() {
           </View>
         </View>
 
-        {/* 1. Widget thời tiết ngoài trời */}
+        {/* Banner Quản lý Cây Trồng Vụ Mùa */}
+        <ActiveCropBanner />
+
+        {/* Chỉ số Bốc Thoát Hơi Nước VPD theo giống cây */}
+        <VPDCard temperature={currentTemp} humidity={currentHumidity} />
+
+        {/* Widget thời tiết ngoài trời */}
         <WeatherWidget weather={weather} loading={loading && !weather} />
 
         {/* 2. Trạng thái nguồn AI & Nút phân tích lại */}
