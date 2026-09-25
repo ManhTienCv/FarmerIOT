@@ -12,6 +12,7 @@
 #include <Wire.h>
 #include <Adafruit_SHT31.h>
 #include <BH1750.h>
+#include <LiquidCrystal_I2C.h>
 
 // ==========================================
 // 1. CẤU HÌNH WI-FI (THAY ĐỔI THEO MẠNG CỦA BẠN)
@@ -22,7 +23,7 @@ const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD"; // Mật khẩu Wi-Fi
 // ==========================================
 // 2. CẤU HÌNH CHÂN PHẦN CỨNG (PINOUT)
 // ==========================================
-// I2C (SHT31 & BH1750)
+// I2C DÙNG CHUNG (SHT31, BH1750, LCD 1602)
 #define I2C_SDA_PIN 21
 #define I2C_SCL_PIN 22
 
@@ -32,6 +33,9 @@ const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD"; // Mật khẩu Wi-Fi
 // Rơ-le điều khiển thiết bị
 #define RELAY_PUMP_PIN 26   // Máy bơm nước
 #define RELAY_LIGHT_PIN 27  // Đèn quang hợp
+
+// Còi báo động Buzzer mini
+#define BUZZER_PIN 25
 
 // Rơ-le thường kích hoạt ở mức LOW (Active LOW). Nếu dùng loại Active HIGH, đổi thành HIGH / LOW ngược lại
 #define RELAY_ON  LOW
@@ -43,9 +47,11 @@ const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD"; // Mật khẩu Wi-Fi
 WebServer server(80);
 Adafruit_SHT31 sht31 = Adafruit_SHT31();
 BH1750 lightMeter;
+LiquidCrystal_I2C lcd(0x27, 16, 2); // Địa chỉ I2C mặc định LCD 1602 thường là 0x27 (hoặc 0x3F)
 
 bool hasSHT31 = false;
 bool hasBH1750 = false;
+bool hasLCD = false;
 
 // Trạng thái thiết bị
 bool isPumpOn = false;
@@ -350,19 +356,61 @@ void handleGetInsights() {
 // ==========================================
 // 7. SETUP & LOOP
 // ==========================================
+void beep(int ms = 60) {
+  digitalWrite(BUZZER_PIN, HIGH);
+  delay(ms);
+  digitalWrite(BUZZER_PIN, LOW);
+}
+
+void updateLCD() {
+  if (!hasLCD) return;
+  static unsigned long lastLcdUpdate = 0;
+  static int screenPage = 0;
+  if (millis() - lastLcdUpdate < 2500) return;
+  lastLcdUpdate = millis();
+
+  lcd.clear();
+  if (screenPage == 0) {
+    // Trang 1: Thông số môi trường thời gian thực
+    lcd.setCursor(0, 0);
+    lcd.print("T:" + String(curTemp, 1) + "C H:" + String(curHumidity, 0) + "%");
+    lcd.setCursor(0, 1);
+    lcd.print("Dat:" + String(curSoilMoisture, 0) + "% L:" + String((int)curLight) + "lx");
+    screenPage = 1;
+  } else {
+    // Trang 2: Trạng thái bơm, đèn & Địa chỉ IP Web Server
+    lcd.setCursor(0, 0);
+    lcd.print("Bom:" + String(isPumpOn ? "BAT " : "TAT ") + "Den:" + String(isLightOn ? "BAT" : "TAT"));
+    lcd.setCursor(0, 1);
+    lcd.print(WiFi.localIP().toString());
+    screenPage = 0;
+  }
+}
+
 void setup() {
   Serial.begin(115200);
   delay(1000);
   Serial.println("\n--- HỆ THỐNG AIoT NÔNG NGHIỆP THÔNG MINH ---");
 
-  // Khởi tạo chân Relay
+  // Khởi tạo chân Relay & Buzzer
   pinMode(RELAY_PUMP_PIN, OUTPUT);
   pinMode(RELAY_LIGHT_PIN, OUTPUT);
+  pinMode(BUZZER_PIN, OUTPUT);
   digitalWrite(RELAY_PUMP_PIN, RELAY_OFF);
   digitalWrite(RELAY_LIGHT_PIN, RELAY_OFF);
+  digitalWrite(BUZZER_PIN, LOW);
 
-  // Khởi tạo I2C
+  // Khởi tạo I2C chung (GPIO 21 SDA, GPIO 22 SCL)
   Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
+
+  // Khởi tạo LCD 1602 qua I2C
+  lcd.init();
+  lcd.backlight();
+  lcd.setCursor(0, 0);
+  lcd.print("AIoT Smart Farm");
+  lcd.setCursor(0, 1);
+  lcd.print("Connecting WiFi");
+  hasLCD = true;
 
   // Khởi tạo SHT31
   if (sht31.begin(0x44)) {
@@ -398,11 +446,32 @@ void setup() {
     Serial.print(">> ĐỊA CHỈ IP ESP32 CỦA BẠN: ");
     Serial.println(WiFi.localIP());
     Serial.println(">> Hãy nhập địa chỉ này vào services/api.ts trên React Native App!");
+
+    if (hasLCD) {
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("WiFi Connected!");
+      lcd.setCursor(0, 1);
+      lcd.print(WiFi.localIP().toString());
+    }
+
+    // Bíp 2 tiếng thông báo hệ thống đã sẵn sàng
+    beep(80);
+    delay(100);
+    beep(80);
   } else {
     Serial.println("\n[LỖI] Không thể kết nối Wi-Fi. ESP32 sẽ phát Access Point dự phòng...");
     WiFi.softAP("ESP32_AIoT_Farm", "12345678");
     Serial.print(">> IP Access Point: ");
     Serial.println(WiFi.softAPIP());
+
+    if (hasLCD) {
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("AP: ESP32_Farm");
+      lcd.setCursor(0, 1);
+      lcd.print(WiFi.softAPIP().toString());
+    }
   }
 
   // Đăng ký REST API Routes
@@ -441,10 +510,15 @@ void setup() {
 void loop() {
   server.handleClient();
 
+  // Đọc cảm biến liên tục
+  readSensors();
+
+  // Cập nhật màn hình LCD luân phiên 2.5s
+  updateLCD();
+
   // Định kỳ 10 phút cập nhật mảng lịch sử một lần
   if (millis() - lastHistoryRecordTime > HISTORY_INTERVAL) {
     lastHistoryRecordTime = millis();
-    readSensors();
 
     tempHistory[historyIndex] = curTemp;
     humidityHistory[historyIndex] = curHumidity;
