@@ -164,12 +164,24 @@ npm run web
 
 #### Cách 2: Chạy trên điện thoại di động (Android / iOS) qua Expo Go
 1. Tải ứng dụng **Expo Go** từ App Store (iOS) hoặc Google Play Store (Android).
-2. Chạy lệnh:
-   ```bash
-   npm start
-   ```
-3. Mở ứng dụng Camera (trên iPhone) hoặc quét mã QR trong app Expo Go (trên Android) để mở ứng dụng.
-4. ⚠️ **Chú ý:** Điện thoại và ESP32 bắt buộc phải kết nối vào **cùng một mạng Wi-Fi**.
+2. **Khởi chạy máy chủ kết nối:**
+   > ⚠️ **Lưu ý quan trọng:** Không nên chạy `npm start` thông thường vì máy tính thường nhận nhầm IP của card mạng ảo VMware/VirtualBox, hoặc điện thoại đang bật 4G/5G/Hotspot sẽ bị lỗi **"The request timed out"**.
+   
+   👉 **Hãy dùng 1 trong các cách chuẩn sau:**
+   - **Cách nhanh nhất (1-Click):** Click đúp vào file [`chay_tunnel.bat`](file:///d:/WebsiteAppFullProject/IOT/chay_tunnel.bat) trên Windows.
+   - **Hoặc chạy lệnh npm:**
+     ```bash
+     npm run start:tunnel
+     ```
+   - **Nếu dùng Command Prompt (CMD):**
+     ```cmd
+     set EXPO_TOKEN=DVmH1hTv_U2pWrJ3LL1nQ_GG6Za9vbImmHxqubsU && npx expo start --tunnel
+     ```
+   - **Nếu dùng PowerShell:**
+     ```powershell
+     $env:EXPO_TOKEN="DVmH1hTv_U2pWrJ3LL1nQ_GG6Za9vbImmHxqubsU"; npx expo start --tunnel
+     ```
+3. Mở ứng dụng Camera (trên iPhone) hoặc quét mã QR trong app Expo Go (trên Android) để mở ứng dụng ngay tức khắc!
 
 ---
 

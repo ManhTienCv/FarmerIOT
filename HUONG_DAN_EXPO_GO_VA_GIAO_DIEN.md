@@ -65,19 +65,39 @@ Hệ thống sử dụng **Hệ chuyên gia nông học (Rule-Based Expert Engin
 ### Bước 2: Khởi chạy dự án trên máy tính
 Dự án đã được tích hợp mã ID dự án trên Expo (`projectId: "0e95295b-6ed9-4eeb-8222-b0267b29d9a5"`).
 
-Mở Terminal tại thư mục `D:\WebsiteAppFullProject\IOT` và chọn 1 trong 2 cách sau:
+> [!WARNING]
+> **TẠI SAO KHÔNG NÊN CHẠY `npm start` THÔNG THƯỜNG?**
+> - Khi bạn chạy `npm start` mặc định, Expo sẽ tự động dò card mạng. Trên máy tính Windows có cài máy ảo **VMware / VirtualBox**, Expo thường nhận nhầm IP ảo (`192.168.6.x` hoặc `192.168.47.x`) thay vì IP Wi-Fi thật.
+> - Đồng thời nếu điện thoại của bạn đang dùng **4G/5G** hoặc đang phát **Hotspot**, điện thoại và máy tính không chung mạng nội bộ $\rightarrow$ Sẽ báo lỗi **"The request timed out"** hoặc app không thể load được.
+> - **Giải pháp tối ưu 100%:** Luôn sử dụng chế độ **Tunnel** hoặc click đúp file chạy nhanh bên dưới!
 
-#### ⚡ Cách A: Chạy qua Tunnel (Khuyên dùng - Dùng được cả khi điện thoại bật 4G/5G)
+---
+
+#### 🌟 Cách 1: Chạy 1-Click bằng file kịch bản có sẵn (Nhanh nhất)
+- **Nếu dùng Command Prompt (CMD):** Click đúp chuột vào file [`chay_tunnel.bat`](file:///d:/WebsiteAppFullProject/IOT/chay_tunnel.bat) hoặc gõ `chay_tunnel.bat`.
+- **Nếu dùng PowerShell:** Chạy file `.\chay_tunnel.ps1`.
+- **Hoặc chạy qua npm:** (Token đã được lưu sẵn trong file `.env`):
+  ```bash
+  npm run start:tunnel
+  ```
+
+---
+
+#### ⚡ Cách 2: Gõ lệnh trực tiếp trong Terminal
+
+##### A. Dành cho **Command Prompt (CMD)** (Màn hình đen truyền thống):
+```cmd
+set EXPO_TOKEN=DVmH1hTv_U2pWrJ3LL1nQ_GG6Za9vbImmHxqubsU && npx expo start --tunnel
+```
+*(Nếu muốn chạy qua IP Hotspot nội bộ: `set REACT_NATIVE_PACKAGER_HOSTNAME=172.20.10.2 && npx expo start -c`)*
+
+##### B. Dành cho **PowerShell** (Màn hình xanh / VS Code Terminal PowerShell):
 ```powershell
 $env:EXPO_TOKEN="DVmH1hTv_U2pWrJ3LL1nQ_GG6Za9vbImmHxqubsU"; npx expo start --tunnel
 ```
+*(Nếu muốn chạy qua IP Hotspot nội bộ: `$env:REACT_NATIVE_PACKAGER_HOSTNAME="172.20.10.2"; npx expo start -c`)*
 
-#### ⚡ Cách B: Chạy qua mạng Wi-Fi LAN nội bộ
-*(Dành cho trường hợp điện thoại và máy tính kết nối chung 1 mạng Wi-Fi)*
-```powershell
-$env:REACT_NATIVE_PACKAGER_HOSTNAME="172.20.10.2"; npx expo start -c
-```
-*(Thay `172.20.10.2` bằng địa chỉ IP Wi-Fi thực tế của máy tính bạn xem qua lệnh `ipconfig`).*
+---
 
 ### Bước 3: Mở ứng dụng trên điện thoại
 - **Cách 1 (Mở trực tiếp từ tài khoản):** Mở app Expo Go $\rightarrow$ Đăng nhập tài khoản Expo $\rightarrow$ Chạm vào dự án **"AIoT Nông nghiệp"** hiển thị sẵn tại trang chủ.
@@ -92,15 +112,15 @@ Khi bạn tạo tài khoản Expo bằng cách đăng nhập qua **GitHub / Goog
 1. Mở trình duyệt và truy cập: **[expo.dev/settings/access-tokens](https://expo.dev/settings/access-tokens)**.
 2. Bấm nút **"Create Token"** $\rightarrow$ Đặt tên bất kỳ (ví dụ: `my-laptop-token`) $\rightarrow$ Bấm **Create**.
 3. Copy chuỗi Token được tạo ra (dạng: `DVmH1hTv_U2p...`).
-4. Tại PowerShell, thiết lập biến môi trường bằng lệnh có dấu ngoặc kép:
-   ```powershell
-   $env:EXPO_TOKEN="<dán_mã_token_vào_đây>"
-   ```
+4. Thiết lập biến môi trường:
+   - **Trên CMD:** `set EXPO_TOKEN=<dán_mã_token>`
+   - **Trên PowerShell:** `$env:EXPO_TOKEN="<dán_mã_token>"`
+   *(Hoặc lưu thẳng vào file `.env` dòng `EXPO_TOKEN=<mã_token>` như dự án đã cấu hình sẵn).*
 5. Kiểm tra đăng nhập thành công bằng lệnh:
    ```powershell
    npx expo whoami
    ```
-   *(Kết quả in ra đúng tên tài khoản của bạn, ví dụ: `manhtieniot`).*
+   *(Kết quả in ra đúng tên tài khoản của bạn: `manhtieniot`).*
 
 ---
 
@@ -108,8 +128,10 @@ Khi bạn tạo tài khoản Expo bằng cách đăng nhập qua **GitHub / Goog
 
 | Sự cố | Nguyên nhân | Cách khắc phục |
 | :--- | :--- | :--- |
+| **Báo lỗi `The request timed out`** | Điện thoại bật 5G/Hotspot hoặc Expo nhận nhầm card mạng ảo VMware | Chạy file `chay_tunnel.bat` hoặc lệnh `npm run start:tunnel` để tạo kết nối Tunnel toàn cầu. |
+| **Lỗi `The filename, directory name, or volume label syntax is incorrect`** | Đang ở cửa sổ **CMD** nhưng lại gõ lệnh của **PowerShell** (`$env:...`) | Dùng cú pháp của CMD: `set EXPO_TOKEN=... && npx expo start --tunnel` hoặc click file `chay_tunnel.bat`. |
 | **Báo lỗi `Project is incompatible (SDK 54 vs SDK 57)`** | Expo Go trên điện thoại đã cập nhật SDK 57 nhưng dự án dùng SDK cũ | Dự án hiện tại đã được nâng cấp lên **SDK 57**, chỉ cần chạy lại `npx expo start -c`. |
-| **Báo lỗi `You need to be signed in to Expo Go`** | Điện thoại đang bật mạng 5G hoặc Expo lấy nhầm IP card mạng ảo VMware | Chạy lệnh `$env:EXPO_TOKEN="..."; npx expo start --tunnel` hoặc kết nối chung Wi-Fi. |
+| **Báo lỗi `You need to be signed in to Expo Go`** | Chưa có Token xác thực khi chạy Tunnel | Chạy lệnh gán `EXPO_TOKEN` như hướng dẫn ở Bước 2. |
 | **PowerShell báo lỗi `The term 'DVmH...' is not recognized`** | Quên đặt mã token vào trong dấu ngoặc kép `""` | Gõ đúng cú pháp: `$env:EXPO_TOKEN="<mã_token>"`. |
 | **Không tải được Expo Go trên iPhone** | Máy iPhone quá cũ hoặc chưa có tài khoản Apple ID | Mở trực tiếp bằng Safari trên iPhone qua địa chỉ: `http://<IP_MÁY_TÍNH>:8082` (chạy lệnh `npx expo start --web`). |
 

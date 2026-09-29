@@ -40,10 +40,20 @@ npm install
   ```bash
   npm run web
   ```
-- **Chạy trên Expo Go / Mobile (Android / iOS) qua Tunnel**:
-  ```powershell
-  $env:EXPO_TOKEN="DVmH1hTv_U2pWrJ3LL1nQ_GG6Za9vbImmHxqubsU"; npx expo start --tunnel
-  ```
+- **Chạy trên Expo Go / Mobile (Android / iOS) qua Tunnel (Khuyên dùng - Chấp cả 4G/5G/Hotspot)**:
+  - **Cách 1-Click trên Windows:** Click đúp file [`chay_tunnel.bat`](file:///d:/WebsiteAppFullProject/IOT/chay_tunnel.bat)
+  - **Hoặc chạy bằng npm:**
+    ```bash
+    npm run start:tunnel
+    ```
+  - **Nếu dùng Command Prompt (CMD):**
+    ```cmd
+    set EXPO_TOKEN=DVmH1hTv_U2pWrJ3LL1nQ_GG6Za9vbImmHxqubsU && npx expo start --tunnel
+    ```
+  - **Nếu dùng PowerShell:**
+    ```powershell
+    $env:EXPO_TOKEN="DVmH1hTv_U2pWrJ3LL1nQ_GG6Za9vbImmHxqubsU"; npx expo start --tunnel
+    ```
 
 ---
 
