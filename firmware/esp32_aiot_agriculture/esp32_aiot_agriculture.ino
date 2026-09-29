@@ -13,6 +13,7 @@
 #include <Adafruit_SHT31.h>
 #include <BH1750.h>
 #include <LiquidCrystal_I2C.h>
+#include <time.h>
 
 // ==========================================
 // 1. CẤU HÌNH WI-FI (THAY ĐỔI THEO MẠNG CỦA BẠN)
@@ -58,6 +59,16 @@ bool isPumpOn = false;
 bool isLightOn = false;
 unsigned long pumpLastToggleTime = 0;
 unsigned long lightLastToggleTime = 0;
+String pumpLastToggledIso = "2026-09-30T00:00:00Z";
+String lightLastToggledIso = "2026-09-30T00:00:00Z";
+
+// Hiệu chuẩn cảm biến độ ẩm đất (Khô trong không khí = 3200, Ngập trong nước = 1200)
+int rawSoilDry = 3200;
+int rawSoilWet = 1200;
+
+// Non-blocking Buzzer
+unsigned long buzzerOffTime = 0;
+bool isBuzzerActive = false;
 
 // Bộ đệm lưu trữ dữ liệu thời gian thực
 float curTemp = 28.0;
@@ -74,6 +85,25 @@ float lightHistory[HISTORY_SIZE] = {0, 500, 3500, 8000, 12500, 18000, 22000, 190
 int historyIndex = 0;
 unsigned long lastHistoryRecordTime = 0;
 const unsigned long HISTORY_INTERVAL = 10 * 60 * 1000; // 10 phút
+
+// Hàm lấy thời gian định dạng ISO 8601 chuẩn
+String getFormattedISOTime() {
+  time_t now = time(nullptr);
+  if (now > 1000000) {
+    char buf[32];
+    struct tm timeinfo;
+    localtime_r(&now, &timeinfo);
+    strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%SZ", &timeinfo);
+    return String(buf);
+  }
+  unsigned long sec = millis() / 1000;
+  int h = (sec / 3600) % 24;
+  int m = (sec / 60) % 60;
+  int s = sec % 60;
+  char buf[32];
+  snprintf(buf, sizeof(buf), "2026-09-30T%02d:%02d:%02dZ", h, m, s);
+  return String(buf);
+}
 
 // ==========================================
 // 4. HÀM TIỆN ÍCH CORS & JSON RESPONSE
@@ -107,10 +137,9 @@ void readSensors() {
     if (l >= 0) curLight = l;
   }
 
-  // 3. Đọc Cảm biến độ ẩm đất (0 - 4095 ADC -> 0 - 100%)
-  // Cảm biến điện dung hoặc điện trở: trong không khí khô ADC ~ 3200-3500, ngập nước ~ 1200-1500
+  // 3. Đọc Cảm biến độ ẩm đất (Sử dụng ngưỡng hiệu chuẩn tự động)
   int rawSoil = analogRead(SOIL_ANALOG_PIN);
-  int mappedSoil = map(rawSoil, 3200, 1200, 0, 100);
+  int mappedSoil = map(rawSoil, rawSoilDry, rawSoilWet, 0, 100);
   curSoilMoisture = constrain(mappedSoil, 0, 100);
 }
 
@@ -135,7 +164,7 @@ void handleGetSensors() {
   s1["max"] = 50;
   s1["optimalMin"] = 22;
   s1["optimalMax"] = 32;
-  s1["updatedAt"] = "vừa xong";
+  s1["updatedAt"] = getFormattedISOTime();
 
   // Độ ẩm không khí
   JsonObject s2 = arr.createNestedObject();
@@ -146,7 +175,7 @@ void handleGetSensors() {
   s2["max"] = 100;
   s2["optimalMin"] = 60;
   s2["optimalMax"] = 80;
-  s2["updatedAt"] = "vừa xong";
+  s2["updatedAt"] = getFormattedISOTime();
 
   // Độ ẩm đất
   JsonObject s3 = arr.createNestedObject();
@@ -157,7 +186,7 @@ void handleGetSensors() {
   s3["max"] = 100;
   s3["optimalMin"] = 45;
   s3["optimalMax"] = 70;
-  s3["updatedAt"] = "vừa xong";
+  s3["updatedAt"] = getFormattedISOTime();
 
   // Cường độ ánh sáng
   JsonObject s4 = arr.createNestedObject();
@@ -168,7 +197,7 @@ void handleGetSensors() {
   s4["max"] = 65535;
   s4["optimalMin"] = 10000;
   s4["optimalMax"] = 25000;
-  s4["updatedAt"] = "vừa xong";
+  s4["updatedAt"] = getFormattedISOTime();
 
   String output;
   serializeJson(doc, output);
@@ -186,13 +215,13 @@ void handleGetDevices() {
   d1["type"] = "pump";
   d1["label"] = "Máy bơm nước";
   d1["isOn"] = isPumpOn;
-  d1["lastToggledAt"] = "Hôm nay";
+  d1["lastToggledAt"] = pumpLastToggledIso;
 
   JsonObject d2 = arr.createNestedObject();
   d2["type"] = "growLight";
   d2["label"] = "Đèn quang hợp";
   d2["isOn"] = isLightOn;
-  d2["lastToggledAt"] = "Hôm nay";
+  d2["lastToggledAt"] = lightLastToggledIso;
 
   String output;
   serializeJson(doc, output);
@@ -224,20 +253,22 @@ void handleToggleDevice() {
     isPumpOn = newState;
     digitalWrite(RELAY_PUMP_PIN, isPumpOn ? RELAY_ON : RELAY_OFF);
     pumpLastToggleTime = millis();
+    pumpLastToggledIso = getFormattedISOTime();
 
     resDoc["type"] = "pump";
     resDoc["label"] = "Máy bơm nước";
     resDoc["isOn"] = isPumpOn;
-    resDoc["lastToggledAt"] = "Vừa xong";
+    resDoc["lastToggledAt"] = pumpLastToggledIso;
   } else if (uri.indexOf("growLight") >= 0) {
     isLightOn = newState;
     digitalWrite(RELAY_LIGHT_PIN, isLightOn ? RELAY_ON : RELAY_OFF);
     lightLastToggleTime = millis();
+    lightLastToggledIso = getFormattedISOTime();
 
     resDoc["type"] = "growLight";
     resDoc["label"] = "Đèn quang hợp";
     resDoc["isOn"] = isLightOn;
-    resDoc["lastToggledAt"] = "Vừa xong";
+    resDoc["lastToggledAt"] = lightLastToggledIso;
   } else {
     server.send(404, "application/json", "{\"error\":\"Thiết bị không tồn tại\"}");
     return;
@@ -248,18 +279,28 @@ void handleToggleDevice() {
   server.send(200, "application/json", resStr);
 }
 
+
 // GET /api/sensors/{type}/history -> Lịch sử đo
 void handleGetHistory() {
   sendCORSHeaders();
   String uri = server.uri();
 
-  StaticJsonDocument<1024> doc;
+  int requestedHours = 12;
+  if (server.hasArg("hours")) {
+    int h = server.arg("hours").toInt();
+    if (h > 0 && h <= 24) requestedHours = h;
+  }
+
+  StaticJsonDocument<2048> doc;
   JsonArray arr = doc.to<JsonArray>();
 
-  for (int i = 0; i < HISTORY_SIZE; i++) {
+  int points = min(requestedHours, HISTORY_SIZE);
+  int stepHours = max(1, requestedHours / points);
+
+  for (int i = 0; i < points; i++) {
     int idx = (historyIndex + i) % HISTORY_SIZE;
     JsonObject pt = arr.createNestedObject();
-    pt["time"] = String(i * 2) + ":00";
+    pt["time"] = String(i * stepHours) + ":00";
 
     if (uri.indexOf("temperature") >= 0) {
       pt["value"] = tempHistory[idx];
@@ -275,6 +316,37 @@ void handleGetHistory() {
   String output;
   serializeJson(doc, output);
   server.send(200, "application/json", output);
+}
+
+// GET/POST /api/sensors/soil/calibration -> Lấy hoặc cập nhật thông số hiệu chuẩn độ ẩm đất
+void handleSoilCalibration() {
+  sendCORSHeaders();
+  if (server.method() == HTTP_OPTIONS) {
+    server.send(204);
+    return;
+  }
+
+  if (server.method() == HTTP_GET) {
+    StaticJsonDocument<256> doc;
+    doc["dry"] = rawSoilDry;
+    doc["wet"] = rawSoilWet;
+    doc["currentRaw"] = analogRead(SOIL_ANALOG_PIN);
+    doc["currentPercent"] = curSoilMoisture;
+    String s;
+    serializeJson(doc, s);
+    server.send(200, "application/json", s);
+    return;
+  }
+
+  if (server.method() == HTTP_POST) {
+    StaticJsonDocument<256> doc;
+    DeserializationError err = deserializeJson(doc, server.arg("plain"));
+    if (!err) {
+      if (doc.containsKey("dry")) rawSoilDry = doc["dry"].as<int>();
+      if (doc.containsKey("wet")) rawSoilWet = doc["wet"].as<int>();
+    }
+    server.send(200, "application/json", "{\"status\":\"success\"}");
+  }
 }
 
 // GET /api/ai/insights -> Edge AI Chẩn đoán cục bộ trên ESP32
@@ -358,9 +430,17 @@ void handleGetInsights() {
 // ==========================================
 void beep(int ms = 60) {
   digitalWrite(BUZZER_PIN, HIGH);
-  delay(ms);
-  digitalWrite(BUZZER_PIN, LOW);
+  buzzerOffTime = millis() + ms;
+  isBuzzerActive = true;
 }
+
+void updateBuzzer() {
+  if (isBuzzerActive && millis() >= buzzerOffTime) {
+    digitalWrite(BUZZER_PIN, LOW);
+    isBuzzerActive = false;
+  }
+}
+
 
 void updateLCD() {
   if (!hasLCD) return;
@@ -455,10 +535,13 @@ void setup() {
       lcd.print(WiFi.localIP().toString());
     }
 
-    // Bíp 2 tiếng thông báo hệ thống đã sẵn sàng
-    beep(80);
-    delay(100);
-    beep(80);
+    // Đồng bộ thời gian thực qua NTP (Múi giờ Việt Nam UTC+7)
+    configTime(7 * 3600, 0, "pool.ntp.org", "time.google.com");
+    pumpLastToggledIso = getFormattedISOTime();
+    lightLastToggledIso = getFormattedISOTime();
+
+    // Bíp 1 tiếng thông báo hệ thống đã sẵn sàng
+    beep(100);
   } else {
     Serial.println("\n[LỖI] Không thể kết nối Wi-Fi. ESP32 sẽ phát Access Point dự phòng...");
     WiFi.softAP("ESP32_AIoT_Farm", "12345678");
@@ -477,6 +560,10 @@ void setup() {
   // Đăng ký REST API Routes
   server.on("/api/sensors", HTTP_GET, handleGetSensors);
   server.on("/api/sensors", HTTP_OPTIONS, handleOptions);
+
+  server.on("/api/sensors/soil/calibration", HTTP_GET, handleSoilCalibration);
+  server.on("/api/sensors/soil/calibration", HTTP_POST, handleSoilCalibration);
+  server.on("/api/sensors/soil/calibration", HTTP_OPTIONS, handleOptions);
 
   server.on("/api/devices", HTTP_GET, handleGetDevices);
   server.on("/api/devices", HTTP_OPTIONS, handleOptions);
@@ -512,6 +599,9 @@ void loop() {
 
   // Đọc cảm biến liên tục
   readSensors();
+
+  // Cập nhật trạng thái Buzzer non-blocking
+  updateBuzzer();
 
   // Cập nhật màn hình LCD luân phiên 2.5s
   updateLCD();

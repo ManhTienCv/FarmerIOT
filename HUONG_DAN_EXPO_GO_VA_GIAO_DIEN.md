@@ -87,13 +87,13 @@ Dự án đã được tích hợp mã ID dự án trên Expo (`projectId: "0e95
 
 ##### A. Dành cho **Command Prompt (CMD)** (Màn hình đen truyền thống):
 ```cmd
-set EXPO_TOKEN=DVmH1hTv_U2pWrJ3LL1nQ_GG6Za9vbImmHxqubsU && npx expo start --tunnel
+set EXPO_TOKEN=<YOUR_EXPO_TOKEN> && npx expo start --tunnel
 ```
 *(Nếu muốn chạy qua IP Hotspot nội bộ: `set REACT_NATIVE_PACKAGER_HOSTNAME=172.20.10.2 && npx expo start -c`)*
 
 ##### B. Dành cho **PowerShell** (Màn hình xanh / VS Code Terminal PowerShell):
 ```powershell
-$env:EXPO_TOKEN="DVmH1hTv_U2pWrJ3LL1nQ_GG6Za9vbImmHxqubsU"; npx expo start --tunnel
+$env:EXPO_TOKEN="<YOUR_EXPO_TOKEN>"; npx expo start --tunnel
 ```
 *(Nếu muốn chạy qua IP Hotspot nội bộ: `$env:REACT_NATIVE_PACKAGER_HOSTNAME="172.20.10.2"; npx expo start -c`)*
 
@@ -111,7 +111,7 @@ Khi bạn tạo tài khoản Expo bằng cách đăng nhập qua **GitHub / Goog
 
 1. Mở trình duyệt và truy cập: **[expo.dev/settings/access-tokens](https://expo.dev/settings/access-tokens)**.
 2. Bấm nút **"Create Token"** $\rightarrow$ Đặt tên bất kỳ (ví dụ: `my-laptop-token`) $\rightarrow$ Bấm **Create**.
-3. Copy chuỗi Token được tạo ra (dạng: `DVmH1hTv_U2p...`).
+3. Copy chuỗi Token được tạo ra (dạng: `exp_token_...`).
 4. Thiết lập biến môi trường:
    - **Trên CMD:** `set EXPO_TOKEN=<dán_mã_token>`
    - **Trên PowerShell:** `$env:EXPO_TOKEN="<dán_mã_token>"`
@@ -132,7 +132,7 @@ Khi bạn tạo tài khoản Expo bằng cách đăng nhập qua **GitHub / Goog
 | **Lỗi `The filename, directory name, or volume label syntax is incorrect`** | Đang ở cửa sổ **CMD** nhưng lại gõ lệnh của **PowerShell** (`$env:...`) | Dùng cú pháp của CMD: `set EXPO_TOKEN=... && npx expo start --tunnel` hoặc click file `chay_tunnel.bat`. |
 | **Báo lỗi `Project is incompatible (SDK 54 vs SDK 57)`** | Expo Go trên điện thoại đã cập nhật SDK 57 nhưng dự án dùng SDK cũ | Dự án hiện tại đã được nâng cấp lên **SDK 57**, chỉ cần chạy lại `npx expo start -c`. |
 | **Báo lỗi `You need to be signed in to Expo Go`** | Chưa có Token xác thực khi chạy Tunnel | Chạy lệnh gán `EXPO_TOKEN` như hướng dẫn ở Bước 2. |
-| **PowerShell báo lỗi `The term 'DVmH...' is not recognized`** | Quên đặt mã token vào trong dấu ngoặc kép `""` | Gõ đúng cú pháp: `$env:EXPO_TOKEN="<mã_token>"`. |
+| **PowerShell báo lỗi `The term 'exp_token...' is not recognized`** | Quên đặt mã token vào trong dấu ngoặc kép `""` | Gõ đúng cú pháp: `$env:EXPO_TOKEN="<mã_token>"`. |
 | **Không tải được Expo Go trên iPhone** | Máy iPhone quá cũ hoặc chưa có tài khoản Apple ID | Mở trực tiếp bằng Safari trên iPhone qua địa chỉ: `http://<IP_MÁY_TÍNH>:8082` (chạy lệnh `npx expo start --web`). |
 
 ---

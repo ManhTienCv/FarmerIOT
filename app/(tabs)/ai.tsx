@@ -253,7 +253,7 @@ export default function AIScreen() {
           <View style={styles.statItem}>
             <TrendingUp size={18} color={colors.primary[500]} strokeWidth={2.2} />
             <Text style={[styles.statValue, { color: colors.primary[500] }]}>{avgConfidence}%</Text>
-            <Text style={styles.statLabel}>Độ tin cậy</Text>
+            <Text style={styles.statLabel}>Độ phù hợp</Text>
           </View>
         </View>
 

@@ -140,10 +140,13 @@ export default function ControlScreen() {
           {devices.map((d, i) => {
             const cfg = deviceConfig[d.type];
             const Icon = d.isOn ? CheckCircle2 : AlertCircle;
-            const time = new Date(d.lastToggledAt).toLocaleTimeString('vi-VN', {
-              hour: '2-digit',
-              minute: '2-digit',
-            });
+            const parsedDate = new Date(d.lastToggledAt);
+            const time = !isNaN(parsedDate.getTime())
+              ? parsedDate.toLocaleTimeString('vi-VN', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })
+              : d.lastToggledAt || 'Vừa xong';
             return (
               <View key={d.type} style={[styles.logItem, i < devices.length - 1 && styles.logItemBorder]}>
                 <View style={[styles.logIcon, { backgroundColor: d.isOn ? 'rgba(45,106,79,0.12)' : 'rgba(30,45,36,0.05)' }]}>

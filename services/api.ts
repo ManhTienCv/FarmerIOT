@@ -40,8 +40,32 @@ export function getUseMock(): boolean {
 }
 
 // ============================================================
-// HÀM GỌI API AN TOÀN VỚI TIMEOUT & ERROR CATCHING
+// HÀM GỌI API AN TOÀN VỚI TIMEOUT & ERROR CATCHING NÂNG CAO
 // ============================================================
+
+export class ApiError extends Error {
+  status?: number;
+  isTimeout: boolean;
+  isNetworkError: boolean;
+  endpoint: string;
+
+  constructor(
+    message: string,
+    options: {
+      status?: number;
+      isTimeout?: boolean;
+      isNetworkError?: boolean;
+      endpoint: string;
+    }
+  ) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = options.status;
+    this.isTimeout = !!options.isTimeout;
+    this.isNetworkError = !!options.isNetworkError;
+    this.endpoint = options.endpoint;
+  }
+}
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const controller = new AbortController();
@@ -59,15 +83,34 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     });
 
     if (!res.ok) {
-      throw new Error(`Yêu cầu đến ${path} thất bại với mã lỗi HTTP ${res.status}`);
+      throw new ApiError(`Lỗi HTTP ${res.status}: Máy chủ ESP32 phản hồi lỗi tại ${path}`, {
+        status: res.status,
+        endpoint: path,
+      });
     }
 
-    return (await res.json()) as T;
-  } catch (error: any) {
-    if (error.name === 'AbortError') {
-      throw new Error(`Hết thời gian chờ (${REQUEST_TIMEOUT_MS / 1000}s) khi kết nối tới ESP32 tại ${BASE_URL}`);
+    try {
+      return (await res.json()) as T;
+    } catch (parseErr: any) {
+      throw new ApiError(
+        `Lỗi định dạng JSON từ ESP32 tại ${path}: ${parseErr?.message || 'Invalid JSON format'}`,
+        { endpoint: path }
+      );
     }
-    throw new Error(`Không thể kết nối tới ESP32 (${error.message || 'Lỗi mạng'}). Vui lòng kiểm tra IP và Wi-Fi.`);
+  } catch (error: any) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    if (error.name === 'AbortError') {
+      throw new ApiError(
+        `Hết thời gian chờ (${REQUEST_TIMEOUT_MS / 1000}s) khi kết nối tới ESP32 tại ${BASE_URL}`,
+        { isTimeout: true, endpoint: path }
+      );
+    }
+    throw new ApiError(
+      `Lỗi kết nối mạng tới ESP32 (${error.message || 'Network request failed'}). Vui lòng kiểm tra IP và Wi-Fi.`,
+      { isNetworkError: true, endpoint: path }
+    );
   } finally {
     clearTimeout(timeoutId);
   }
@@ -127,3 +170,27 @@ export async function getAIInsights(): Promise<AIInsight[]> {
   const analysis = await getAIAnalysis();
   return analysis.insights;
 }
+
+// ---------- Hiệu chuẩn Cảm biến Độ ẩm đất (Soil Calibration) ----------
+export interface SoilCalibrationData {
+  dry: number;
+  wet: number;
+  currentRaw?: number;
+  currentPercent?: number;
+}
+
+export async function getSoilCalibration(): Promise<SoilCalibrationData> {
+  if (USE_MOCK) {
+    return { dry: 3200, wet: 1200, currentRaw: 2200, currentPercent: 50 };
+  }
+  return request<SoilCalibrationData>('/sensors/soil/calibration');
+}
+
+export async function setSoilCalibration(data: { dry: number; wet: number }): Promise<void> {
+  if (USE_MOCK) return;
+  await request<{ status: string }>('/sensors/soil/calibration', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+

@@ -160,7 +160,7 @@ export let BASE_URL = 'http://192.168.1.105/api';
 ```bash
 npm run web
 ```
-Ứng dụng sẽ tự động mở tại địa chỉ `http://localhost:8081`.
+Ứng dụng sẽ tự động mở tại địa chỉ `http://localhost:8082`.
 
 #### Cách 2: Chạy trên điện thoại di động (Android / iOS) qua Expo Go
 1. Tải ứng dụng **Expo Go** từ App Store (iOS) hoặc Google Play Store (Android).
@@ -175,11 +175,11 @@ npm run web
      ```
    - **Nếu dùng Command Prompt (CMD):**
      ```cmd
-     set EXPO_TOKEN=DVmH1hTv_U2pWrJ3LL1nQ_GG6Za9vbImmHxqubsU && npx expo start --tunnel
+     set EXPO_TOKEN=<YOUR_EXPO_TOKEN> && npx expo start --tunnel
      ```
    - **Nếu dùng PowerShell:**
      ```powershell
-     $env:EXPO_TOKEN="DVmH1hTv_U2pWrJ3LL1nQ_GG6Za9vbImmHxqubsU"; npx expo start --tunnel
+     $env:EXPO_TOKEN="<YOUR_EXPO_TOKEN>"; npx expo start --tunnel
      ```
 3. Mở ứng dụng Camera (trên iPhone) hoặc quét mã QR trong app Expo Go (trên Android) để mở ứng dụng ngay tức khắc!
 

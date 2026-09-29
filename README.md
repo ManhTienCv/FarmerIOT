@@ -48,11 +48,11 @@ npm install
     ```
   - **Nếu dùng Command Prompt (CMD):**
     ```cmd
-    set EXPO_TOKEN=DVmH1hTv_U2pWrJ3LL1nQ_GG6Za9vbImmHxqubsU && npx expo start --tunnel
+    set EXPO_TOKEN=<YOUR_EXPO_TOKEN> && npx expo start --tunnel
     ```
   - **Nếu dùng PowerShell:**
     ```powershell
-    $env:EXPO_TOKEN="DVmH1hTv_U2pWrJ3LL1nQ_GG6Za9vbImmHxqubsU"; npx expo start --tunnel
+    $env:EXPO_TOKEN="<YOUR_EXPO_TOKEN>"; npx expo start --tunnel
     ```
 
 ---
