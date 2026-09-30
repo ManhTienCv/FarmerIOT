@@ -8,6 +8,26 @@
 const http = require('http');
 const { Pool } = require('pg');
 const mqtt = require('mqtt');
+const fs = require('fs');
+const path = require('path');
+
+// Tự động đọc file .env
+try {
+  const envPath = path.join(__dirname, '.env');
+  if (fs.existsSync(envPath)) {
+    const envContent = fs.readFileSync(envPath, 'utf8');
+    envContent.split('\n').forEach((line) => {
+      const trimmed = line.trim();
+      if (trimmed && !trimmed.startsWith('#')) {
+        const [k, ...v] = trimmed.split('=');
+        if (k && v.length) process.env[k.trim()] = v.join('=').trim();
+      }
+    });
+  }
+} catch (e) {}
+
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
+const SUPABASE_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
 
 const PORT = 5001;
 
@@ -119,6 +139,26 @@ mqttClient.on('message', async (topic, payload) => {
       console.log(
         `[PostgreSQL] + INSERT sensor_telemetry ID=${res.rows[0].id}: Nhiệt độ=${temp}°C, Độ ẩm khí=${hum}%, Độ ẩm đất=${soil}%, Ánh sáng=${light}lx`
       );
+
+      // Đồng thời đồng bộ lên Supabase Cloud (nếu đã cấu hình)
+      if (SUPABASE_URL && SUPABASE_KEY) {
+        fetch(`${SUPABASE_URL}/rest/v1/sensor_telemetry`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            apikey: SUPABASE_KEY,
+            Authorization: `Bearer ${SUPABASE_KEY}`,
+            Prefer: 'return=minimal',
+          },
+          body: JSON.stringify({
+            temperature: temp,
+            air_humidity: hum,
+            soil_moisture: soil,
+            light: light,
+            recorded_at: recordedAt,
+          }),
+        }).catch((err) => console.warn('[Supabase Cloud] Đồng bộ lỗi:', err.message));
+      }
     }
 
     // Hứng trạng thái bật/tắt thiết bị -> Lưu vào bảng device_events
@@ -137,6 +177,25 @@ mqttClient.on('message', async (topic, payload) => {
       console.log(
         `[PostgreSQL] + INSERT device_events ID=${res.rows[0].id}: Thiết bị=${devType} -> ${isOn ? 'BẬT' : 'TẮT'}`
       );
+
+      // Đồng thời đồng bộ lên Supabase Cloud
+      if (SUPABASE_URL && SUPABASE_KEY) {
+        fetch(`${SUPABASE_URL}/rest/v1/device_events`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            apikey: SUPABASE_KEY,
+            Authorization: `Bearer ${SUPABASE_KEY}`,
+            Prefer: 'return=minimal',
+          },
+          body: JSON.stringify({
+            device_type: devType,
+            is_on: isOn,
+            toggled_by: toggledBy,
+            recorded_at: recordedAt,
+          }),
+        }).catch((err) => console.warn('[Supabase Cloud] Đồng bộ lỗi:', err.message));
+      }
     }
   } catch (err) {
     console.error('[Bridge] Lỗi xử lý bản tin MQTT:', err.message);
