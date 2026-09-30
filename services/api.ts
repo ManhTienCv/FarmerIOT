@@ -9,7 +9,6 @@ import type {
   SensorHistoryPoint,
   SensorType,
 } from '@/types';
-import { mockSensors, mockDevices, mockInsights, mockHistory } from '@/services/mockData';
 import {
   getCachedSensors,
   getCachedDevices,
@@ -18,15 +17,14 @@ import {
 } from '@/services/mqttService';
 import { getStoredSensors, getStoredDevices } from '@/services/historyStorage';
 import { fetchSensorHistory } from '@/services/databaseService';
+import { analyzeAgricultureData, type AIAnalysisResult, type PrecisionCropContext } from '@/services/aiService';
+import type { OutdoorWeather } from '@/services/weather';
 
 // ============================================================
 // CẤU HÌNH KẾT NỐI BACKEND
 // ============================================================
-// Đổi BASE_URL thành địa chỉ IP mạng LAN của ESP32 khi nạp thật (ví dụ: 'http://192.168.1.100/api')
 export let BASE_URL = 'http://192.168.1.100/api';
-
-// Bật/tắt dùng mock data. Mặc định là false để sử dụng 100% dữ liệu thực tế từ vườn.
-export let USE_MOCK = false;
+export const USE_MOCK = false;
 
 // Thời gian timeout tối đa cho mỗi request đến ESP32 (mili-giây)
 const REQUEST_TIMEOUT_MS = 5000;
@@ -39,12 +37,9 @@ export function getBaseUrl(): string {
   return BASE_URL;
 }
 
-export function setUseMock(useMock: boolean) {
-  USE_MOCK = useMock;
-}
-
+export function setUseMock(_useMock: boolean) {}
 export function getUseMock(): boolean {
-  return USE_MOCK;
+  return false;
 }
 
 // ============================================================
@@ -136,10 +131,8 @@ export async function getSensors(): Promise<SensorReading[]> {
   if (stored && stored.length > 0) {
     return stored;
   }
-  // 3. Nếu bật cờ giả lập thủ công
-  if (USE_MOCK) return mockSensors();
 
-  // 4. Thử gọi API LAN nội bộ nếu có
+  // 3. Thử gọi API LAN nội bộ nếu có
   try {
     return await request<SensorReading[]>('/sensors');
   } catch {
@@ -149,16 +142,13 @@ export async function getSensors(): Promise<SensorReading[]> {
 
 export async function getSensorHistory(
   type: SensorType,
-  hours = 12,
+  hours = 12
 ): Promise<SensorHistoryPoint[]> {
-  // 1. Lấy dữ liệu lịch sử thực tế từ Cloud Database (Supabase) hoặc AsyncStorage
+  // Lấy dữ liệu lịch sử thực tế từ Cloud Database (Supabase) hoặc Local PostgreSQL
   const history = await fetchSensorHistory(type, hours);
   if (history && history.length > 0) {
     return history;
   }
-  // 2. Nếu bật mock
-  if (USE_MOCK) return mockHistory(type, hours);
-
   return [];
 }
 
@@ -170,8 +160,6 @@ export async function getDevices(): Promise<DeviceState[]> {
   }
   const stored = await getStoredDevices();
   if (stored && stored.length > 0) return stored;
-
-  if (USE_MOCK) return mockDevices();
 
   try {
     return await request<DeviceState[]>('/devices');
@@ -195,24 +183,11 @@ export async function toggleDevice(type: DeviceType, isOn: boolean): Promise<Dev
       };
     }
   }
-  if (USE_MOCK) {
-    // Giả lập độ trễ phần cứng
-    await new Promise((r) => setTimeout(r, 250));
-    return {
-      type,
-      label: type === 'pump' ? 'Máy bơm nước' : 'Đèn quang hợp',
-      isOn,
-      lastToggledAt: new Date().toISOString(),
-    };
-  }
   return request<DeviceState>(`/devices/${type}`, {
     method: 'POST',
     body: JSON.stringify({ isOn }),
   });
 }
-
-import { analyzeAgricultureData, type AIAnalysisResult, type PrecisionCropContext } from '@/services/aiService';
-import type { OutdoorWeather } from '@/services/weather';
 
 // ---------- AI Chẩn đoán Đa Nền Tảng (Gemini -> Groq -> Local) ----------
 export async function getAIAnalysis(
@@ -238,14 +213,10 @@ export interface SoilCalibrationData {
 }
 
 export async function getSoilCalibration(): Promise<SoilCalibrationData> {
-  if (USE_MOCK) {
-    return { dry: 3200, wet: 1200, currentRaw: 2200, currentPercent: 50 };
-  }
   return request<SoilCalibrationData>('/sensors/soil/calibration');
 }
 
 export async function setSoilCalibration(data: { dry: number; wet: number }): Promise<void> {
-  if (USE_MOCK) return;
   await request<{ status: string }>('/sensors/soil/calibration', {
     method: 'POST',
     body: JSON.stringify(data),

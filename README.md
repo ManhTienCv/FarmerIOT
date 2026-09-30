@@ -4,27 +4,20 @@
 
 ---
 
-## 📚 Tài Liệu Hướng Dẫn Kèm Theo
+## 📚 Tài Liệu Hướng Dẫn Kèm Theo (Thư mục docs/)
 
-1. 👉 [**HUONG_DAN_EXPO_GO_VA_GIAO_DIEN.md**](file:///d:/WebsiteAppFullProject/IOT/HUONG_DAN_EXPO_GO_VA_GIAO_DIEN.md): Hướng dẫn kết nối Expo Go trên iPhone/Android, đăng nhập Token GitHub SSO, chạy chế độ Tunnel và chi tiết các nâng cấp giao diện.
-2. 👉 [**HUONG_DAN_SU_DUNG.md**](file:///d:/WebsiteAppFullProject/IOT/HUONG_DAN_SU_DUNG.md): Hướng dẫn toàn diện từ A-Z về sơ đồ nối dây phần cứng (Wiring Pinout), nạp code Arduino cho ESP32, cấu hình IP mạng và xử lý sự cố.
+1. 👉 [**HUONG_DAN_DAU_NOI_PHAN_CUNG_A_TO_Z.md**](file:///d:/WebsiteAppFullProject/IOT/docs/HUONG_DAN_DAU_NOI_PHAN_CUNG_A_TO_Z.md): Sơ đồ đấu nối dây cảm biến DHT22, độ ẩm đất, ánh sáng BH1750, rơ-le và nạp code ESP32.
+2. 👉 [**HUONG_DAN_EXPO_GO_VA_GIAO_DIEN.md**](file:///d:/WebsiteAppFullProject/IOT/docs/HUONG_DAN_EXPO_GO_VA_GIAO_DIEN.md): Hướng dẫn kết nối Expo Go trên iPhone/Android, chạy Tunnel và chi tiết giao diện.
+3. 👉 [**HUONG_DAN_SU_DUNG.md**](file:///d:/WebsiteAppFullProject/IOT/docs/HUONG_DAN_SU_DUNG.md): Hướng dẫn toàn diện vận hành hệ thống nông nghiệp thông minh.
 
 ---
 
-## 🌟 Tính Năng Chính
+## 🌟 Kiến Trúc Đám Mây & Phần Cứng 24/7
 
-1. **Giám Sát Thời Gian Thực (Dashboard)**:
-   - Hiển thị thông số 4 cảm biến: Nhiệt độ (°C), Độ ẩm không khí (%), Độ ẩm đất (%), Cường độ ánh sáng (lx).
-   - Biểu đồ biến thiên dạng sóng SVG trong 12 giờ gần nhất.
-   - Hệ thống cảnh báo trực quan khi giá trị cảm biến vượt ngưỡng an toàn.
-
-2. **Bảng Điều Khiển Thiết Bị (Control)**:
-   - Bật/tắt các thiết bị ngoại vi (Máy bơm nước, Đèn quang hợp) với phản hồi chuyển động mượt mà (Reanimated).
-   - Nhật ký ghi nhận thời gian đóng/ngắt mạch rơ-le gần nhất.
-
-3. **Chẩn Đoán Thông Minh (Smart Diagnosis)**:
-   - Hệ luật chuyên gia nông học phát hiện rủi ro nấm bệnh, tình trạng thiếu nước hoặc thừa/thiếu ánh sáng.
-   - Đánh giá độ tin cậy và đề xuất hành động xử lý kịp thời.
+- **Phần cứng**: ESP32 gửi dữ liệu cảm biến & nhận lệnh qua MQTT (HiveMQ Cloud).
+- **Backend (Render / Local)**: Chạy [`server.js`](file:///d:/WebsiteAppFullProject/IOT/server.js) hứng MQTT 24/7 và đồng bộ vào PostgreSQL.
+- **Database (Supabase / pgAdmin)**: PostgreSQL lưu trữ `sensor_telemetry`, `device_events` và `crop_journals`.
+- **Frontend (Vercel / Expo)**: Web & Mobile app hiển thị dữ liệu thực tế 100%, đồ thị lịch sử và chẩn đoán AI.
 
 ---
 
@@ -35,32 +28,19 @@
 npm install
 ```
 
-### 2. Khởi chạy ứng dụng:
+### 2. Chạy Máy chủ Cầu nối (Backend):
+```bash
+# Chạy Backend (tự động kết nối Supabase Cloud & PostgreSQL cục bộ):
+npm run server
+```
+
+### 3. Chạy Ứng dụng Frontend:
 - **Chạy trên Web**:
   ```bash
   npm run web
   ```
-- **Chạy trên Expo Go / Mobile (Android / iOS) qua Tunnel (Khuyên dùng - Chấp cả 4G/5G/Hotspot)**:
-  - **Cách 1-Click trên Windows:** Click đúp file [`chay_tunnel.bat`](file:///d:/WebsiteAppFullProject/IOT/chay_tunnel.bat)
-  - **Hoặc chạy bằng npm:**
-    ```bash
-    npm run start:tunnel
-    ```
-  - **Nếu dùng Command Prompt (CMD):**
-    ```cmd
-    set EXPO_TOKEN=<YOUR_EXPO_TOKEN> && npx expo start --tunnel
-    ```
-  - **Nếu dùng PowerShell:**
-    ```powershell
-    $env:EXPO_TOKEN="<YOUR_EXPO_TOKEN>"; npx expo start --tunnel
-    ```
-
----
-
-## 🔌 Cấu Hình Kết Nối Phần Cứng (ESP32 / Backend)
-
-Mở file [`services/api.ts`](file:///d:/WebsiteAppFullProject/IOT/services/api.ts) để cấu hình:
-- **`USE_MOCK = true`**: Sử dụng dữ liệu giả lập (dùng cho phát triển giao diện).
-- **`USE_MOCK = false`**: Kết nối tới ESP32 thật qua địa chỉ IP LAN nội bộ.
+- **Chạy trên Mobile qua Tunnel (Chấp cả 4G/5G/Wi-Fi)**:
+  - Click đúp file [`chay_tunnel.bat`](file:///d:/WebsiteAppFullProject/IOT/chay_tunnel.bat) trên Windows.
+  - Hoặc chạy: `npm run start:tunnel`
 
 

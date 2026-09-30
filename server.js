@@ -57,6 +57,27 @@ if (process.env.DATABASE_URL || process.env.NODE_ENV !== 'production') {
     pool.connect().then(async (c) => {
       isLocalDbConnected = true;
       console.log('[PostgreSQL] Đã kết nối Database thành công!');
+
+      await c.query(`
+        CREATE TABLE IF NOT EXISTS sensor_telemetry (
+          id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+          temperature NUMERIC(5, 2),
+          air_humidity NUMERIC(5, 2),
+          soil_moisture NUMERIC(5, 2),
+          light NUMERIC(8, 2),
+          recorded_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_sensor_telemetry_recorded_at ON sensor_telemetry (recorded_at DESC);
+        CREATE TABLE IF NOT EXISTS device_events (
+          id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+          device_type TEXT NOT NULL,
+          is_on BOOLEAN NOT NULL,
+          toggled_by TEXT DEFAULT 'user',
+          recorded_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_device_events_recorded_at ON device_events (recorded_at DESC);
+      `).catch(() => {});
+
       c.release();
     }).catch((err) => {
       isLocalDbConnected = false;
@@ -250,6 +271,102 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: e.message }));
     }
+    return;
+  }
+
+  // REST API: Lấy bản tin cảm biến mới nhất
+  if (pathname === '/api/sensors/latest') {
+    try {
+      if (pool && isLocalDbConnected) {
+        const q = 'SELECT * FROM sensor_telemetry ORDER BY recorded_at DESC LIMIT 1;';
+        const result = await pool.query(q);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(result.rows[0] || null));
+        return;
+      }
+      const resp = await fetch(
+        `${SUPABASE_URL}/rest/v1/sensor_telemetry?order=recorded_at.desc&limit=1`,
+        { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
+      );
+      const rows = await resp.json();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(rows[0] || null));
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: e.message }));
+    }
+    return;
+  }
+
+  // REST API: Lấy lịch sử thiết bị
+  if (pathname === '/api/devices/history') {
+    try {
+      if (pool && isLocalDbConnected) {
+        const q = 'SELECT * FROM device_events ORDER BY recorded_at DESC LIMIT 50;';
+        const result = await pool.query(q);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(result.rows));
+        return;
+      }
+      const resp = await fetch(
+        `${SUPABASE_URL}/rest/v1/device_events?order=recorded_at.desc&limit=50`,
+        { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
+      );
+      const rows = await resp.json();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(Array.isArray(rows) ? rows : []));
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: e.message }));
+    }
+    return;
+  }
+
+  // REST API: Ghi nhận dữ liệu cảm biến thủ công
+  if (pathname === '/api/sensors/telemetry' && req.method === 'POST') {
+    let body = '';
+    req.on('data', (chunk) => { body += chunk; });
+    req.on('end', async () => {
+      try {
+        const payload = JSON.parse(body || '{}');
+        const temp = payload.temperature != null ? Number(payload.temperature) : null;
+        const hum = payload.air_humidity != null ? Number(payload.air_humidity) : null;
+        const soil = payload.soil_moisture != null ? Number(payload.soil_moisture) : null;
+        const light = payload.light != null ? Number(payload.light) : null;
+        const recordedAt = payload.recorded_at || new Date().toISOString();
+
+        if (pool && isLocalDbConnected) {
+          pool.query(
+            `INSERT INTO sensor_telemetry (temperature, air_humidity, soil_moisture, light, recorded_at) VALUES ($1, $2, $3, $4, $5)`,
+            [temp, hum, soil, light, recordedAt]
+          ).catch(() => {});
+        }
+
+        if (SUPABASE_URL && SUPABASE_KEY) {
+          await fetch(`${SUPABASE_URL}/rest/v1/sensor_telemetry`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              apikey: SUPABASE_KEY,
+              Authorization: `Bearer ${SUPABASE_KEY}`,
+            },
+            body: JSON.stringify({
+              temperature: temp,
+              air_humidity: hum,
+              soil_moisture: soil,
+              light: light,
+              recorded_at: recordedAt,
+            }),
+          });
+        }
+
+        res.writeHead(201, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true }));
+      } catch (e) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: e.message }));
+      }
+    });
     return;
   }
 
