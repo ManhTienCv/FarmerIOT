@@ -10,6 +10,12 @@ import type {
   SensorType,
 } from '@/types';
 import { mockSensors, mockDevices, mockInsights, mockHistory } from '@/services/mockData';
+import {
+  getCachedSensors,
+  getCachedDevices,
+  sendMqttDeviceCommand,
+  isMqttActive,
+} from '@/services/mqttService';
 
 // ============================================================
 // CẤU HÌNH KẾT NỐI BACKEND
@@ -118,6 +124,10 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 // ---------- Cảm biến ----------
 export async function getSensors(): Promise<SensorReading[]> {
+  const cached = getCachedSensors();
+  if (cached && cached.length > 0) {
+    return cached;
+  }
   if (USE_MOCK) return mockSensors();
   return request<SensorReading[]>('/sensors');
 }
@@ -132,11 +142,26 @@ export async function getSensorHistory(
 
 // ---------- Thiết bị ----------
 export async function getDevices(): Promise<DeviceState[]> {
+  if (isMqttActive()) {
+    const cached = getCachedDevices();
+    if (cached && cached.length > 0) return cached;
+  }
   if (USE_MOCK) return mockDevices();
   return request<DeviceState[]>('/devices');
 }
 
 export async function toggleDevice(type: DeviceType, isOn: boolean): Promise<DeviceState> {
+  if (isMqttActive()) {
+    const ok = await sendMqttDeviceCommand(type, isOn);
+    if (ok) {
+      return {
+        type,
+        label: type === 'pump' ? 'Máy bơm nước' : 'Đèn quang hợp',
+        isOn,
+        lastToggledAt: new Date().toISOString(),
+      };
+    }
+  }
   if (USE_MOCK) {
     // Giả lập độ trễ phần cứng
     await new Promise((r) => setTimeout(r, 250));

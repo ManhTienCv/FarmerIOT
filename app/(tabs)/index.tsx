@@ -13,6 +13,7 @@ import ActiveCropBanner from '@/components/ActiveCropBanner';
 import VPDCard from '@/components/VPDCard';
 import { useTabVisibility } from '@/context/TabVisibilityContext';
 import { useCrop } from '@/context/CropContext';
+import { connectMqtt, subscribeSensors, subscribeConnection } from '@/services/mqttService';
 
 export default function DashboardScreen() {
   const { onScroll } = useTabVisibility();
@@ -22,6 +23,7 @@ export default function DashboardScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [selected, setSelected] = useState<SensorType>('temperature');
   const [history, setHistory] = useState<{ time: string; value: number }[]>([]);
+  const [isMqttOnline, setIsMqttOnline] = useState(false);
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -44,7 +46,23 @@ export default function DashboardScreen() {
     load();
   }, [load]);
 
-  // Tự cập nhật dữ liệu cảm biến định kỳ mỗi 8 giây
+  // Kết nối MQTT Broker trên HiveMQ Cloud và đăng ký nhận dữ liệu thời gian thực
+  useEffect(() => {
+    connectMqtt();
+    const unsubSensors = subscribeSensors((liveSensors) => {
+      setSensors(liveSensors);
+      setLoading(false);
+    });
+    const unsubConn = subscribeConnection((connected) => {
+      setIsMqttOnline(connected);
+    });
+    return () => {
+      unsubSensors();
+      unsubConn();
+    };
+  }, []);
+
+  // Tự cập nhật dữ liệu cảm biến định kỳ mỗi 8 giây (dự phòng khi không có MQTT)
   useEffect(() => {
     const id = setInterval(() => {
       load();
@@ -115,15 +133,38 @@ export default function DashboardScreen() {
       >
         {/* Header */}
         <View style={styles.header}>
-          <View>
+          <View style={styles.headerTextGroup}>
             <Text style={styles.greeting}>Nông trại thông minh</Text>
             <Text style={styles.title}>Tổng quan hệ thống</Text>
           </View>
-          <View style={[styles.liveBadge, alerts.length > 0 ? styles.liveAlert : styles.liveOk]}>
-            <View style={[styles.liveDot, { backgroundColor: alerts.length > 0 ? colors.danger : colors.success }]} />
-            <Text style={[styles.liveText, { color: alerts.length > 0 ? colors.danger : colors.success }]}>
-              {alerts.length > 0 ? `${alerts.length} cảnh báo` : 'Ổn định'}
-            </Text>
+          <View style={styles.headerBadges}>
+            <View
+              style={[
+                styles.liveBadge,
+                isMqttOnline ? styles.cloudOnlineBadge : styles.cloudOfflineBadge,
+              ]}
+            >
+              <View
+                style={[
+                  styles.liveDot,
+                  { backgroundColor: isMqttOnline ? '#10B981' : '#F59E0B' },
+                ]}
+              />
+              <Text
+                style={[
+                  styles.liveText,
+                  { color: isMqttOnline ? '#065F46' : '#92400E' },
+                ]}
+              >
+                {isMqttOnline ? 'Cloud MQTT' : 'Mạng nội bộ'}
+              </Text>
+            </View>
+            <View style={[styles.liveBadge, alerts.length > 0 ? styles.liveAlert : styles.liveOk]}>
+              <View style={[styles.liveDot, { backgroundColor: alerts.length > 0 ? colors.danger : colors.success }]} />
+              <Text style={[styles.liveText, { color: alerts.length > 0 ? colors.danger : colors.success }]}>
+                {alerts.length > 0 ? `${alerts.length} cảnh báo` : 'Ổn định'}
+              </Text>
+            </View>
           </View>
         </View>
 
@@ -288,6 +329,17 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: spacing.lg,
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  headerTextGroup: {
+    flexShrink: 1,
+  },
+  headerBadges: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    flexWrap: 'wrap',
   },
   greeting: {
     ...typography.bodySm,
@@ -308,6 +360,8 @@ const styles = StyleSheet.create({
   },
   liveOk: { backgroundColor: 'rgba(45,106,79,0.10)' },
   liveAlert: { backgroundColor: 'rgba(214,64,69,0.10)' },
+  cloudOnlineBadge: { backgroundColor: 'rgba(16,185,129,0.12)' },
+  cloudOfflineBadge: { backgroundColor: 'rgba(245,158,11,0.12)' },
   liveDot: {
     width: 8,
     height: 8,

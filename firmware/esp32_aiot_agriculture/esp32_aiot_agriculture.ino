@@ -7,6 +7,8 @@
  */
 
 #include <WiFi.h>
+#include <WiFiClientSecure.h>
+#include <PubSubClient.h>
 #include <WebServer.h>
 #include <ArduinoJson.h>
 #include <Wire.h>
@@ -20,6 +22,20 @@
 // ==========================================
 const char* WIFI_SSID = "YOUR_WIFI_NAME";        // Tên Wi-Fi nhà bạn
 const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD"; // Mật khẩu Wi-Fi
+
+// ==========================================
+// 1.1. CẤU HÌNH HIVEMQ CLOUD MQTT (GLOBAL 24/7)
+// ==========================================
+const char* MQTT_SERVER = "002ca57eb19d41ce82e81b3d1614d718.s1.eu.hivemq.cloud";
+const int MQTT_PORT = 8883; // Port MQTTS (Bảo mật SSL/TLS)
+const char* MQTT_USER = "farmer";
+const char* MQTT_PASS = "farmerbig12!";
+
+const char* TOPIC_SENSORS = "farm/sensors";
+const char* TOPIC_CONTROL_PUMP = "farm/control/pump";
+const char* TOPIC_CONTROL_LIGHT = "farm/control/growLight";
+const char* TOPIC_STATE_PUMP = "farm/state/pump";
+const char* TOPIC_STATE_LIGHT = "farm/state/growLight";
 
 // ==========================================
 // 2. CẤU HÌNH CHÂN PHẦN CỨNG (PINOUT)
@@ -46,6 +62,12 @@ const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD"; // Mật khẩu Wi-Fi
 // 3. KHỞI TẠO ĐỐI TƯỢNG VÀ BIẾN TOÀN CỤC
 // ==========================================
 WebServer server(80);
+WiFiClientSecure espClient;
+PubSubClient mqttClient(espClient);
+unsigned long lastMqttRetry = 0;
+unsigned long lastTelemetryPublish = 0;
+const unsigned long TELEMETRY_INTERVAL = 4000; // Gửi dữ liệu cảm biến lên HiveMQ Cloud mỗi 4 giây
+
 Adafruit_SHT31 sht31 = Adafruit_SHT31();
 BH1750 lightMeter;
 LiquidCrystal_I2C lcd(0x27, 16, 2); // Địa chỉ I2C mặc định LCD 1602 thường là 0x27 (hoặc 0x3F)
@@ -69,6 +91,19 @@ int rawSoilWet = 1200;
 // Non-blocking Buzzer
 unsigned long buzzerOffTime = 0;
 bool isBuzzerActive = false;
+
+void beep(int ms = 60) {
+  digitalWrite(BUZZER_PIN, HIGH);
+  buzzerOffTime = millis() + ms;
+  isBuzzerActive = true;
+}
+
+void updateBuzzer() {
+  if (isBuzzerActive && millis() >= buzzerOffTime) {
+    digitalWrite(BUZZER_PIN, LOW);
+    isBuzzerActive = false;
+  }
+}
 
 // Bộ đệm lưu trữ dữ liệu thời gian thực
 float curTemp = 28.0;
@@ -141,6 +176,108 @@ void readSensors() {
   int rawSoil = analogRead(SOIL_ANALOG_PIN);
   int mappedSoil = map(rawSoil, rawSoilDry, rawSoilWet, 0, 100);
   curSoilMoisture = constrain(mappedSoil, 0, 100);
+}
+
+// ==========================================
+// 5.1. CÁC HÀM GIAO TIẾP CLOUD MQTT (HIVEMQ)
+// ==========================================
+void publishDeviceState(const char* devType, bool state, String isoTime) {
+  if (!mqttClient.connected()) return;
+  StaticJsonDocument<256> doc;
+  doc["type"] = devType;
+  doc["label"] = (strcmp(devType, "pump") == 0) ? "Máy bơm nước" : "Đèn quang hợp";
+  doc["isOn"] = state;
+  doc["lastToggledAt"] = isoTime;
+  char buf[256];
+  serializeJson(doc, buf);
+  const char* topic = (strcmp(devType, "pump") == 0) ? TOPIC_STATE_PUMP : TOPIC_STATE_LIGHT;
+  mqttClient.publish(topic, buf, true); // retained = true để App vừa mở lên là nhận ngay trạng thái
+}
+
+void publishSensorsTelemetry() {
+  if (!mqttClient.connected()) return;
+  readSensors();
+  StaticJsonDocument<512> doc;
+  doc["temperature"] = round(curTemp * 10.0) / 10.0;
+  doc["airHumidity"] = round(curHumidity);
+  doc["soilMoisture"] = round(curSoilMoisture);
+  doc["light"] = round(curLight);
+  doc["updatedAt"] = getFormattedISOTime();
+  char buf[512];
+  serializeJson(doc, buf);
+  mqttClient.publish(TOPIC_SENSORS, buf);
+}
+
+void mqttCallback(char* topic, byte* payload, unsigned int length) {
+  char message[512];
+  if (length >= sizeof(message)) return;
+  memcpy(message, payload, length);
+  message[length] = '\0';
+  Serial.print("[MQTT Cloud] Nhận lệnh từ topic [");
+  Serial.print(topic);
+  Serial.print("]: ");
+  Serial.println(message);
+
+  StaticJsonDocument<256> doc;
+  DeserializationError err = deserializeJson(doc, message);
+  if (err) {
+    Serial.println("[MQTT Cloud] Lỗi giải mã JSON lệnh");
+    return;
+  }
+
+  bool newState = false;
+  if (doc.containsKey("isOn")) {
+    newState = doc["isOn"].as<bool>();
+  }
+
+  if (strcmp(topic, TOPIC_CONTROL_PUMP) == 0) {
+    isPumpOn = newState;
+    digitalWrite(RELAY_PUMP_PIN, isPumpOn ? RELAY_ON : RELAY_OFF);
+    pumpLastToggleTime = millis();
+    pumpLastToggledIso = getFormattedISOTime();
+    Serial.print("[RELAY] Máy bơm chuyển trạng thái: ");
+    Serial.println(isPumpOn ? "BẬT" : "TẮT");
+    beep(60);
+    publishDeviceState("pump", isPumpOn, pumpLastToggledIso);
+  } else if (strcmp(topic, TOPIC_CONTROL_LIGHT) == 0) {
+    isLightOn = newState;
+    digitalWrite(RELAY_LIGHT_PIN, isLightOn ? RELAY_ON : RELAY_OFF);
+    lightLastToggleTime = millis();
+    lightLastToggledIso = getFormattedISOTime();
+    Serial.print("[RELAY] Đèn quang hợp chuyển trạng thái: ");
+    Serial.println(isLightOn ? "BẬT" : "TẮT");
+    beep(60);
+    publishDeviceState("growLight", isLightOn, lightLastToggledIso);
+  }
+}
+
+void reconnectMQTT() {
+  if (WiFi.status() != WL_CONNECTED) return;
+  if (mqttClient.connected()) return;
+
+  unsigned long now = millis();
+  if (now - lastMqttRetry < 5000) return; // Thử kết nối lại mỗi 5 giây mà không làm đơ hệ thống
+  lastMqttRetry = now;
+
+  Serial.print("[MQTT Cloud] Đang kết nối HiveMQ: ");
+  Serial.println(MQTT_SERVER);
+
+  String clientId = "ESP32_Farm_" + String(random(0xffff), HEX);
+
+  if (mqttClient.connect(clientId.c_str(), MQTT_USER, MQTT_PASS)) {
+    Serial.println("[OK] Đã kết nối HiveMQ Cloud thành công!");
+    mqttClient.subscribe(TOPIC_CONTROL_PUMP);
+    mqttClient.subscribe(TOPIC_CONTROL_LIGHT);
+    Serial.println("[OK] Đã subscribe topic điều khiển máy bơm và đèn.");
+
+    // Gửi trạng thái hiện tại lên Cloud
+    publishDeviceState("pump", isPumpOn, pumpLastToggledIso);
+    publishDeviceState("growLight", isLightOn, lightLastToggledIso);
+    publishSensorsTelemetry();
+  } else {
+    Serial.print("[LỖI] Kết nối HiveMQ thất bại, rc=");
+    Serial.println(mqttClient.state());
+  }
 }
 
 // ==========================================
@@ -254,6 +391,8 @@ void handleToggleDevice() {
     digitalWrite(RELAY_PUMP_PIN, isPumpOn ? RELAY_ON : RELAY_OFF);
     pumpLastToggleTime = millis();
     pumpLastToggledIso = getFormattedISOTime();
+    beep(60);
+    publishDeviceState("pump", isPumpOn, pumpLastToggledIso);
 
     resDoc["type"] = "pump";
     resDoc["label"] = "Máy bơm nước";
@@ -264,6 +403,8 @@ void handleToggleDevice() {
     digitalWrite(RELAY_LIGHT_PIN, isLightOn ? RELAY_ON : RELAY_OFF);
     lightLastToggleTime = millis();
     lightLastToggledIso = getFormattedISOTime();
+    beep(60);
+    publishDeviceState("growLight", isLightOn, lightLastToggledIso);
 
     resDoc["type"] = "growLight";
     resDoc["label"] = "Đèn quang hợp";
@@ -428,20 +569,6 @@ void handleGetInsights() {
 // ==========================================
 // 7. SETUP & LOOP
 // ==========================================
-void beep(int ms = 60) {
-  digitalWrite(BUZZER_PIN, HIGH);
-  buzzerOffTime = millis() + ms;
-  isBuzzerActive = true;
-}
-
-void updateBuzzer() {
-  if (isBuzzerActive && millis() >= buzzerOffTime) {
-    digitalWrite(BUZZER_PIN, LOW);
-    isBuzzerActive = false;
-  }
-}
-
-
 void updateLCD() {
   if (!hasLCD) return;
   static unsigned long lastLcdUpdate = 0;
@@ -458,9 +585,10 @@ void updateLCD() {
     lcd.print("Dat:" + String(curSoilMoisture, 0) + "% L:" + String((int)curLight) + "lx");
     screenPage = 1;
   } else {
-    // Trang 2: Trạng thái bơm, đèn & Địa chỉ IP Web Server
+    // Trang 2: Trạng thái bơm, đèn, chế độ Cloud [C]/Local [L] & Địa chỉ IP Web Server
     lcd.setCursor(0, 0);
-    lcd.print("Bom:" + String(isPumpOn ? "BAT " : "TAT ") + "Den:" + String(isLightOn ? "BAT" : "TAT"));
+    String cloudTag = mqttClient.connected() ? " [C]" : " [L]";
+    lcd.print("B:" + String(isPumpOn ? "ON " : "OFF ") + "D:" + String(isLightOn ? "ON" : "OFF") + cloudTag);
     lcd.setCursor(0, 1);
     lcd.print(WiFi.localIP().toString());
     screenPage = 0;
@@ -590,6 +718,16 @@ void setup() {
     }
   });
 
+  // Khởi tạo MQTT Client với TLS bảo mật
+  espClient.setInsecure(); // Sử dụng kết nối bảo mật tới HiveMQ Cloud không cần nạp chứng chỉ gốc nặng nề
+  mqttClient.setServer(MQTT_SERVER, MQTT_PORT);
+  mqttClient.setCallback(mqttCallback);
+  mqttClient.setBufferSize(1024);
+
+  if (WiFi.status() == WL_CONNECTED) {
+    reconnectMQTT();
+  }
+
   server.begin();
   Serial.println("[OK] HTTP REST API Server đã sẵn sàng phục vụ App!");
 }
@@ -597,8 +735,23 @@ void setup() {
 void loop() {
   server.handleClient();
 
+  // Duy trì kết nối MQTT và xử lý các gói tin điều khiển từ Cloud
+  if (WiFi.status() == WL_CONNECTED) {
+    if (!mqttClient.connected()) {
+      reconnectMQTT();
+    } else {
+      mqttClient.loop();
+    }
+  }
+
   // Đọc cảm biến liên tục
   readSensors();
+
+  // Gửi telemetry lên HiveMQ Cloud định kỳ mỗi 4 giây
+  if (millis() - lastTelemetryPublish >= TELEMETRY_INTERVAL) {
+    lastTelemetryPublish = millis();
+    publishSensorsTelemetry();
+  }
 
   // Cập nhật trạng thái Buzzer non-blocking
   updateBuzzer();

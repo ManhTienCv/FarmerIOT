@@ -8,6 +8,7 @@ import { getDevices, toggleDevice } from '@/services/api';
 import ControlButton from '@/components/ControlButton';
 import SectionHeader from '@/components/SectionHeader';
 import { useTabVisibility } from '@/context/TabVisibilityContext';
+import { connectMqtt, subscribeDevices, subscribeConnection } from '@/services/mqttService';
 
 const deviceConfig: Record<DeviceType, { icon: typeof Droplets; accent: string; desc: string }> = {
   pump: { icon: Droplets, accent: colors.water[500], desc: 'Bơm nước tưới cây' },
@@ -20,6 +21,7 @@ export default function ControlScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [toggling, setToggling] = useState<DeviceType | null>(null);
+  const [isMqttOnline, setIsMqttOnline] = useState(false);
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -39,6 +41,29 @@ export default function ControlScreen() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Kết nối MQTT Broker trên HiveMQ Cloud và đăng ký nhận trạng thái thiết bị thời gian thực
+  useEffect(() => {
+    connectMqtt();
+    const unsubDevices = subscribeDevices((dev) => {
+      setDevices((prev) => {
+        if (!prev.length) return [dev];
+        const exists = prev.some((d) => d.type === dev.type);
+        if (exists) {
+          return prev.map((d) => (d.type === dev.type ? dev : d));
+        }
+        return [...prev, dev];
+      });
+      setLoading(false);
+    });
+    const unsubConn = subscribeConnection((connected) => {
+      setIsMqttOnline(connected);
+    });
+    return () => {
+      unsubDevices();
+      unsubConn();
+    };
+  }, []);
 
   const handleToggle = useCallback(async (type: DeviceType, isOn: boolean) => {
     setToggling(type);
@@ -88,6 +113,27 @@ export default function ControlScreen() {
           <View>
             <Text style={styles.greeting}>Điều khiển từ xa</Text>
             <Text style={styles.title}>Bảng điều khiển</Text>
+          </View>
+          <View
+            style={[
+              styles.liveBadge,
+              isMqttOnline ? styles.cloudOnlineBadge : styles.cloudOfflineBadge,
+            ]}
+          >
+            <View
+              style={[
+                styles.liveDot,
+                { backgroundColor: isMqttOnline ? '#10B981' : '#F59E0B' },
+              ]}
+            />
+            <Text
+              style={[
+                styles.liveText,
+                { color: isMqttOnline ? '#065F46' : '#92400E' },
+              ]}
+            >
+              {isMqttOnline ? 'Cloud MQTT' : 'Mạng nội bộ'}
+            </Text>
           </View>
         </View>
 
@@ -218,6 +264,25 @@ const styles = StyleSheet.create({
   title: {
     ...typography.h1,
     color: colors.text,
+  },
+  liveBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: spacing.xs + 2,
+    borderRadius: radius.pill,
+    gap: spacing.xs,
+  },
+  cloudOnlineBadge: { backgroundColor: 'rgba(16,185,129,0.12)' },
+  cloudOfflineBadge: { backgroundColor: 'rgba(245,158,11,0.12)' },
+  liveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  liveText: {
+    ...typography.caption,
+    fontWeight: '700',
   },
   summaryCard: {
     flexDirection: 'row',
