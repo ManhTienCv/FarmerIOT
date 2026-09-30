@@ -63,7 +63,28 @@ export default function AIScreen() {
         getOutdoorWeather().catch(() => null),
       ]);
 
-      if (sensorData && sensorData.length > 0) setSensors(sensorData);
+      if (sensorData && sensorData.length > 0) {
+        setSensors(sensorData);
+      } else {
+        setSensors([]);
+        if (weatherData) setWeather(weatherData);
+        setInsights([
+          {
+            id: 'awaiting_hardware',
+            level: 'info',
+            title: 'Đang đợi dữ liệu cảm biến thực tế',
+            description: `Hệ thống AI đã ngắt hoàn toàn dữ liệu giả định và đang đợi kết nối từ ESP32 để chẩn đoán cho cây ${selectedCrop.name} (${currentStage.name}).`,
+            recommendation: 'Hãy cấp nguồn cho ESP32 ngoài vườn. Ngay khi có số đo thực tế, AI sẽ tự động phân tích.',
+            createdAt: 'Chờ kết nối',
+          },
+        ]);
+        setProviderInfo({
+          provider: 'local',
+          name: 'Chờ phần cứng',
+          timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+        });
+        return;
+      }
       if (weatherData) setWeather(weatherData);
 
       const temp = sensorData.find((s) => s.type === 'temperature')?.value ?? 28;

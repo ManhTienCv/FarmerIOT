@@ -16,6 +16,8 @@ import {
   sendMqttDeviceCommand,
   isMqttActive,
 } from '@/services/mqttService';
+import { getStoredSensors, getStoredDevices } from '@/services/historyStorage';
+import { fetchSensorHistory } from '@/services/databaseService';
 
 // ============================================================
 // CẤU HÌNH KẾT NỐI BACKEND
@@ -23,8 +25,8 @@ import {
 // Đổi BASE_URL thành địa chỉ IP mạng LAN của ESP32 khi nạp thật (ví dụ: 'http://192.168.1.100/api')
 export let BASE_URL = 'http://192.168.1.100/api';
 
-// Bật/tắt dùng mock data. Đặt false khi kết nối phần cứng ESP32.
-export let USE_MOCK = true;
+// Bật/tắt dùng mock data. Mặc định là false để sử dụng 100% dữ liệu thực tế từ vườn.
+export let USE_MOCK = false;
 
 // Thời gian timeout tối đa cho mỗi request đến ESP32 (mili-giây)
 const REQUEST_TIMEOUT_MS = 5000;
@@ -124,20 +126,40 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 // ---------- Cảm biến ----------
 export async function getSensors(): Promise<SensorReading[]> {
+  // 1. Dữ liệu thời gian thực nhận từ MQTT Cloud
   const cached = getCachedSensors();
   if (cached && cached.length > 0) {
     return cached;
   }
+  // 2. Dữ liệu thực tế đã lưu trước đó trong bộ nhớ
+  const stored = await getStoredSensors();
+  if (stored && stored.length > 0) {
+    return stored;
+  }
+  // 3. Nếu bật cờ giả lập thủ công
   if (USE_MOCK) return mockSensors();
-  return request<SensorReading[]>('/sensors');
+
+  // 4. Thử gọi API LAN nội bộ nếu có
+  try {
+    return await request<SensorReading[]>('/sensors');
+  } catch {
+    return [];
+  }
 }
 
 export async function getSensorHistory(
   type: SensorType,
   hours = 12,
 ): Promise<SensorHistoryPoint[]> {
+  // 1. Lấy dữ liệu lịch sử thực tế từ Cloud Database (Supabase) hoặc AsyncStorage
+  const history = await fetchSensorHistory(type, hours);
+  if (history && history.length > 0) {
+    return history;
+  }
+  // 2. Nếu bật mock
   if (USE_MOCK) return mockHistory(type, hours);
-  return request<SensorHistoryPoint[]>(`/sensors/${type}/history?hours=${hours}`);
+
+  return [];
 }
 
 // ---------- Thiết bị ----------
@@ -146,8 +168,19 @@ export async function getDevices(): Promise<DeviceState[]> {
     const cached = getCachedDevices();
     if (cached && cached.length > 0) return cached;
   }
+  const stored = await getStoredDevices();
+  if (stored && stored.length > 0) return stored;
+
   if (USE_MOCK) return mockDevices();
-  return request<DeviceState[]>('/devices');
+
+  try {
+    return await request<DeviceState[]>('/devices');
+  } catch {
+    return [
+      { type: 'pump', label: 'Máy bơm nước', isOn: false, lastToggledAt: '' },
+      { type: 'growLight', label: 'Đèn quang hợp', isOn: false, lastToggledAt: '' },
+    ];
+  }
 }
 
 export async function toggleDevice(type: DeviceType, isOn: boolean): Promise<DeviceState> {

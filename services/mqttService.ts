@@ -1,8 +1,12 @@
-// Dịch vụ MQTT thời gian thực kết nối tới HiveMQ Cloud qua WebSocket Secure (WSS).
-// Hoạt động trơn tru cả trên Web PWA (iPhone / Android / Desktop) và React Native.
-
 import Paho from 'paho-mqtt';
 import type { SensorReading, DeviceState, DeviceType } from '@/types';
+import {
+  saveRealSensors,
+  getStoredSensors,
+  saveRealDevices,
+  getStoredDevices,
+} from '@/services/historyStorage';
+import { logSensorTelemetryToDatabase } from '@/services/databaseService';
 
 // ============================================================
 // CẤU HÌNH HIVEMQ CLOUD BROKER
@@ -66,6 +70,9 @@ function notifyConnection(status: boolean) {
 
 function notifySensors(sensors: SensorReading[]) {
   latestSensors = sensors;
+  saveRealSensors(sensors).catch(() => {});
+  logSensorTelemetryToDatabase(sensors).catch(() => {});
+
   sensorListeners.forEach((listener) => {
     try {
       listener(sensors);
@@ -77,6 +84,8 @@ function notifySensors(sensors: SensorReading[]) {
 
 function notifyDevice(device: DeviceState) {
   latestDevices[device.type] = device;
+  saveRealDevices([latestDevices.pump, latestDevices.growLight]).catch(() => {});
+
   deviceListeners.forEach((listener) => {
     try {
       listener(device);
@@ -85,6 +94,25 @@ function notifyDevice(device: DeviceState) {
     }
   });
 }
+
+// Khởi động: Đọc các chỉ số thực tế đã lưu trước đó từ bộ nhớ cục bộ
+getStoredSensors()
+  .then((stored) => {
+    if (stored && stored.length > 0 && !latestSensors) {
+      latestSensors = stored;
+    }
+  })
+  .catch(() => {});
+
+getStoredDevices()
+  .then((stored) => {
+    if (stored && stored.length > 0) {
+      for (const d of stored) {
+        latestDevices[d.type] = d;
+      }
+    }
+  })
+  .catch(() => {});
 
 // ============================================================
 // HÀM CHUYỂN ĐỔI DỮ LIỆU TELEMETRY TỪ ESP32

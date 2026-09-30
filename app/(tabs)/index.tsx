@@ -208,22 +208,32 @@ export default function DashboardScreen() {
           title="Cảm biến thời gian thực"
           subtitle={`Ngưỡng chuẩn tối ưu: ${selectedCrop.name} (${currentStage.name})`}
         />
-        <View style={styles.grid}>
-          {sensors.map((s) => {
-            const range = getStageRange(s.type);
-            return (
-              <View key={s.type} style={styles.gridItem}>
-                <SensorCard
-                  reading={s}
-                  optimalMin={range?.optimalMin}
-                  optimalMax={range?.optimalMax}
-                  cropTargetName={selectedCrop.name}
-                  onPress={() => setSelected(s.type)}
-                />
-              </View>
-            );
-          })}
-        </View>
+        {sensors.length === 0 ? (
+          <View style={styles.waitingCard}>
+            <ActivityIndicator size="small" color={colors.primary[500]} />
+            <Text style={styles.waitingTitle}>Đang đợi dữ liệu thực từ ESP32</Text>
+            <Text style={styles.waitingDesc}>
+              Hệ thống đã ngắt toàn bộ dữ liệu giả lập. Hãy cắm nguồn cho ESP32 ngoài vườn, các thông số cảm biến thực tế sẽ lập tức xuất hiện tại đây theo thời gian thực.
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.grid}>
+            {sensors.map((s) => {
+              const range = getStageRange(s.type);
+              return (
+                <View key={s.type} style={styles.gridItem}>
+                  <SensorCard
+                    reading={s}
+                    optimalMin={range?.optimalMin}
+                    optimalMax={range?.optimalMax}
+                    cropTargetName={selectedCrop.name}
+                    onPress={() => setSelected(s.type)}
+                  />
+                </View>
+              );
+            })}
+          </View>
+        )}
 
         {/* Chart */}
         {selectedReading && (() => {
@@ -254,7 +264,17 @@ export default function DashboardScreen() {
                     </Text>
                   </View>
                 </View>
-                <MiniChart data={history} color={selectedMeta.color} height={140} />
+                {history.length >= 2 ? (
+                  <MiniChart data={history} color={selectedMeta.color} height={140} />
+                ) : (
+                  <View style={styles.chartEmpty}>
+                    <Text style={styles.chartEmptyText}>
+                      {history.length === 1
+                        ? 'Đã ghi nhận 1 điểm đo. Cần thêm dữ liệu theo thời gian để vẽ đường cong...'
+                        : 'Đang tích lũy các điểm đo thực tế từ cảm biến...'}
+                    </Text>
+                  </View>
+                )}
               </View>
             </>
           );
@@ -478,5 +498,41 @@ const styles = StyleSheet.create({
   alertDesc: {
     ...typography.bodySm,
     color: colors.textMuted,
+  },
+  waitingCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: spacing.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: spacing.sm,
+    ...shadows.soft,
+    marginVertical: spacing.md,
+  },
+  waitingTitle: {
+    ...typography.h3,
+    color: colors.text,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  waitingDesc: {
+    ...typography.bodySm,
+    color: colors.textMuted,
+    textAlign: 'center',
+    lineHeight: 20,
+    paddingHorizontal: spacing.md,
+  },
+  chartEmpty: {
+    paddingVertical: spacing.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chartEmptyText: {
+    ...typography.bodySm,
+    color: colors.textMuted,
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
 });
