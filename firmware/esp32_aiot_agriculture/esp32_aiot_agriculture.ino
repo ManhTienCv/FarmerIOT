@@ -7,6 +7,7 @@
  */
 
 #include <WiFi.h>
+#include <WiFiMulti.h>
 #include <WiFiClientSecure.h>
 #include <PubSubClient.h>
 #include <WebServer.h>
@@ -17,11 +18,26 @@
 #include <LiquidCrystal_I2C.h>
 #include <time.h>
 
+WiFiMulti wifiMulti;
+
 // ==========================================
-// 1. CẤU HÌNH WI-FI (THAY ĐỔI THEO MẠNG CỦA BẠN)
+// 1. CẤU HÌNH WI-FI ĐA MẠNG (TỰ ĐỘNG BẮT MẠNG KHẢ DỤNG)
+// ESP32 sẽ tự động kết nối mạng nào có sóng mạnh nhất:
+// - Ở nhà: tự bắt Wi-Fi nhà
+// - Ở trường: tự bắt Điểm phát sóng Hotspot 4G/5G từ Điện thoại
 // ==========================================
-const char* WIFI_SSID = "YOUR_WIFI_NAME";        // Tên Wi-Fi nhà bạn
-const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD"; // Mật khẩu Wi-Fi
+// Mạng 1: Wi-Fi Nhà / Phòng trọ
+const char* WIFI_SSID_1 = "WIFI_NHA_BAN";
+const char* WIFI_PASS_1 = "MAT_KHAU_WIFI_NHA";
+
+// Mạng 2: Điểm phát sóng Hotspot 4G/5G từ điện thoại cá nhân
+// (LƯU Ý: Với iPhone, hãy bật "Tối đa hóa khả năng tương thích" để phát sóng 2.4GHz cho ESP32)
+const char* WIFI_SSID_2 = "HOTSPOT_DIEN_THOAI";
+const char* WIFI_PASS_2 = "MAT_KHAU_HOTSPOT";
+
+// Mạng 3: Dự phòng (Wi-Fi Trường học / Thư viện)
+const char* WIFI_SSID_3 = "WIFI_DU_PHONG";
+const char* WIFI_PASS_3 = "";
 
 // ==========================================
 // 1.1. CẤU HÌNH HIVEMQ CLOUD MQTT (GLOBAL 24/7)
@@ -636,14 +652,17 @@ void setup() {
     Serial.println("[CẢNH BÁO] Không tìm thấy BH1750, chuyển sang chế độ mô phỏng.");
   }
 
-  // Kết nối Wi-Fi
-  Serial.print("Đang kết nối tới Wi-Fi: ");
-  Serial.println(WIFI_SSID);
+  // Kết nối Wi-Fi Đa Mạng (WiFiMulti)
   WiFi.mode(WIFI_STA);
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  wifiMulti.addAP(WIFI_SSID_1, WIFI_PASS_1);
+  wifiMulti.addAP(WIFI_SSID_2, WIFI_PASS_2);
+  if (strlen(WIFI_SSID_3) > 0) {
+    wifiMulti.addAP(WIFI_SSID_3, WIFI_PASS_3);
+  }
 
+  Serial.println("[Wi-Fi] Đang quét và tự động kết nối mạng khả dụng (Nhà / 4G-5G Hotspot)...");
   int attempts = 0;
-  while (WiFi.status() != WL_CONNECTED && attempts < 25) {
+  while (wifiMulti.run() != WL_CONNECTED && attempts < 30) {
     delay(500);
     Serial.print(".");
     attempts++;
@@ -651,14 +670,15 @@ void setup() {
 
   if (WiFi.status() == WL_CONNECTED) {
     Serial.println("\n[OK] Kết nối Wi-Fi thành công!");
+    Serial.print(">> ĐANG KẾT NỐI TỚI MẠNG: ");
+    Serial.println(WiFi.SSID());
     Serial.print(">> ĐỊA CHỈ IP ESP32 CỦA BẠN: ");
     Serial.println(WiFi.localIP());
-    Serial.println(">> Hãy nhập địa chỉ này vào services/api.ts trên React Native App!");
 
     if (hasLCD) {
       lcd.clear();
       lcd.setCursor(0, 0);
-      lcd.print("WiFi Connected!");
+      lcd.print(WiFi.SSID().substring(0, 16));
       lcd.setCursor(0, 1);
       lcd.print(WiFi.localIP().toString());
     }
@@ -735,8 +755,8 @@ void setup() {
 void loop() {
   server.handleClient();
 
-  // Duy trì kết nối MQTT và xử lý các gói tin điều khiển từ Cloud
-  if (WiFi.status() == WL_CONNECTED) {
+  // Duy trì kết nối Wi-Fi và MQTT (Tự động chuyển mạng nếu mất sóng)
+  if (wifiMulti.run() == WL_CONNECTED) {
     if (!mqttClient.connected()) {
       reconnectMQTT();
     } else {
