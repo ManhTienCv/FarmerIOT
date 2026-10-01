@@ -76,7 +76,7 @@ export default function ActiveCropBanner({ onPressManage }: ActiveCropBannerProp
             <View style={styles.progressTitleWrap}>
               <Calendar size={13} color={colors.primary[500]} />
               <Text style={styles.progressLabel}>
-                Tiến độ: <Text style={styles.progressValue}>Ngày {dayOfCrop}</Text>/{selectedCrop.totalDays} ngày ({progressPercent}%)
+                Tiến độ: <Text style={styles.progressValue}>Ngày {dayOfCrop}</Text> / {selectedCrop.totalDays} ({progressPercent}%)
               </Text>
             </View>
 
@@ -140,8 +140,8 @@ export default function ActiveCropBanner({ onPressManage }: ActiveCropBannerProp
         {currentStage.advisoryNote && (
           <View style={styles.advisoryBox}>
             <Info size={14} color={colors.primary[600]} style={{ marginTop: 2 }} />
-            <Text style={styles.advisoryText} numberOfLines={2}>
-              <Text style={styles.advisoryPrefix}>Chăm sóc ({currentStage.daysRange}): </Text>
+            <Text style={styles.advisoryText} numberOfLines={3}>
+              <Text style={styles.advisoryPrefix}>Lưu ý ({currentStage.daysRange}): </Text>
               {currentStage.advisoryNote}
             </Text>
           </View>

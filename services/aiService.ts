@@ -325,7 +325,7 @@ export async function analyzeAgricultureData(
     return {
       insights: geminiInsights,
       provider: 'gemini',
-      providerName: 'Google Gemini 3.6 Flash',
+      providerName: 'Gemini AI',
       weather,
       timestamp: now,
     };
@@ -339,7 +339,7 @@ export async function analyzeAgricultureData(
     return {
       insights: groqInsights,
       provider: 'groq',
-      providerName: 'Groq Cloud (GPT-OSS)',
+      providerName: 'Groq Cloud',
       weather,
       timestamp: now,
     };
@@ -352,7 +352,7 @@ export async function analyzeAgricultureData(
   return {
     insights: localInsights,
     provider: 'local',
-    providerName: 'Hệ chuyên gia Nông học Cục bộ (Offline)',
+    providerName: 'Chuyên gia Offline',
     weather,
     timestamp: now,
   };

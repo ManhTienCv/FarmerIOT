@@ -214,7 +214,7 @@ export default function AIScreen() {
         {/* 2. Trạng thái nguồn AI & Nút phân tích lại */}
         <View style={styles.statusToolbar}>
           <View style={styles.providerWrap}>
-            <Text style={styles.engineLabel}>Động cơ phân tích:</Text>
+            <Text style={styles.engineLabel}>Động cơ:</Text>
             {renderProviderBadge()}
           </View>
 

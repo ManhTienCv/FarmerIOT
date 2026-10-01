@@ -34,15 +34,12 @@ function VPDCardComponent({ temperature, humidity }: VPDCardProps) {
           <View style={styles.iconWrap}>
             <Wind size={20} color={colors.primary[500]} strokeWidth={2.2} />
           </View>
-          <View>
-            <View style={styles.nameRow}>
-              <Text style={styles.title}>Chỉ Số Bốc Thoát Hơi Nước (VPD)</Text>
-              <View style={styles.sciPill}>
-                <Text style={styles.sciPillText}>Khoa học Nông nghiệp</Text>
-              </View>
-            </View>
-            <Text style={styles.subtitle}>
-              Áp suất thâm hụt hơi nước · Đo lường hoạt động khí khổng lá
+          <View style={styles.headerTextCol}>
+            <Text style={styles.title} numberOfLines={1}>
+              Chỉ số VPD
+            </Text>
+            <Text style={styles.subtitle} numberOfLines={1}>
+              Thoát hơi nước & độ mở khí khổng
             </Text>
           </View>
         </View>
@@ -63,9 +60,7 @@ function VPDCardComponent({ temperature, humidity }: VPDCardProps) {
         </View>
 
         <View style={styles.targetCol}>
-          <Text style={styles.targetLabel}>
-            Ngưỡng tối ưu {selectedCrop.name} ({currentStage.name}):
-          </Text>
+          <Text style={styles.targetLabel}>Mục tiêu tối ưu:</Text>
           <Text style={styles.targetValue}>
             {optMin.toFixed(2)} - {optMax.toFixed(2)} kPa
           </Text>
@@ -101,7 +96,7 @@ function VPDCardComponent({ temperature, humidity }: VPDCardProps) {
         {/* Labels dưới thang đo */}
         <View style={styles.gaugeLabels}>
           <Text style={styles.gaugeScaleText}>0.0 (Ẩm)</Text>
-          <Text style={styles.gaugeScaleCenter}>0.8 - 1.2 (Quang hợp cực đại)</Text>
+          <Text style={styles.gaugeScaleCenter}>Tối ưu ({optMin.toFixed(1)} - {optMax.toFixed(1)})</Text>
           <Text style={styles.gaugeScaleText}>2.0+ (Khô)</Text>
         </View>
       </View>
@@ -110,9 +105,9 @@ function VPDCardComponent({ temperature, humidity }: VPDCardProps) {
       <View style={styles.explanationBox}>
         <Text style={styles.descText}>{statusInfo.description}</Text>
         <View style={styles.actionRow}>
-          <Sparkles size={14} color={colors.primary[600]} style={{ marginTop: 1 }} />
+          <Sparkles size={14} color={colors.primary[600]} style={{ marginTop: 2 }} />
           <Text style={styles.actionText}>
-            <Text style={styles.actionPrefix}>Hành động khuyến nghị: </Text>
+            <Text style={styles.actionPrefix}>Khuyến nghị: </Text>
             {statusInfo.recommendation}
           </Text>
         </View>
@@ -145,38 +140,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
     flex: 1,
+    marginRight: spacing.xs,
   },
   iconWrap: {
-    width: 40,
-    height: 40,
+    width: 38,
+    height: 38,
     borderRadius: radius.md,
     backgroundColor: colors.primary[50],
     alignItems: 'center',
     justifyContent: 'center',
   },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
+  headerTextCol: {
+    flex: 1,
   },
   title: {
     ...typography.h3,
     fontSize: 15,
     color: colors.text,
   },
-  sciPill: {
-    backgroundColor: colors.primary[100],
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: radius.pill,
-  },
-  sciPillText: {
-    fontSize: 9,
-    fontFamily: 'Inter-SemiBold',
-    color: colors.primary[700],
-  },
   subtitle: {
     ...typography.caption,
+    fontSize: 11.5,
     color: colors.textMuted,
     marginTop: 1,
   },
@@ -184,10 +168,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: spacing.sm + 2,
-    paddingVertical: spacing.xs + 1,
+    paddingVertical: spacing.xs,
     borderRadius: radius.pill,
-    gap: spacing.xs,
-    marginLeft: spacing.xs,
+    gap: 5,
+    flexShrink: 0,
   },
   statusDot: {
     width: 7,

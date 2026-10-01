@@ -35,45 +35,45 @@ export function getVPDStatus(vpd: number, targetRange?: StageThresholdRange): VP
     if (vpd < targetRange.min) {
       return {
         status: 'danger_low',
-        label: 'Ẩm độ quá bão hòa',
-        description: 'VPD dưới ngưỡng sinh trưởng của cây. Cây khó thoát hơi nước để vận chuyển canxi.',
+        label: 'Quá ẩm',
+        description: 'VPD quá thấp. Khí khổng khó thoát hơi nước để luân chuyển Canxi.',
         color: colors.water[500],
-        recommendation: 'Bật quạt thông gió, ngưng tưới phun sương để giảm ẩm.',
+        recommendation: 'Bật thông gió, ngưng tưới phun sương để giảm ẩm.',
       };
     }
     if (vpd < targetRange.optimalMin) {
       return {
         status: 'seedling',
-        label: 'Mát mẻ (Dưới mức tối ưu)',
-        description: 'VPD hơi thấp, khí khổng mở một phần. Phù hợp cây con hoặc thời tiết mát.',
+        label: 'Ẩm nhẹ',
+        description: 'VPD dưới mức tối ưu, thích hợp giai đoạn cây con hoặc trời mát.',
         color: colors.accent[500],
-        recommendation: 'Tăng nhiệt độ nhẹ hoặc thông thoáng khí trong vườn.',
+        recommendation: 'Duy trì thông thoáng khí tự nhiên trong vườn.',
       };
     }
     if (vpd <= targetRange.optimalMax) {
       return {
         status: 'optimal',
-        label: 'Vùng quang hợp cực đại',
-        description: 'Khí khổng mở hoàn hảo, tốc độ hút dinh dưỡng và hấp thu CO2 tối ưu nhất cho cây.',
+        label: 'Tối ưu',
+        description: 'Khí khổng mở lý tưởng, quang hợp và hút dinh dưỡng đạt hiệu suất cao nhất.',
         color: colors.primary[500],
-        recommendation: 'Duy trì ổn định môi trường vườn hiện tại.',
+        recommendation: 'Duy trì ổn định môi trường hiện tại.',
       };
     }
     if (vpd <= targetRange.max) {
       return {
         status: 'stress',
-        label: 'Áp lực thoát hơi nước tăng',
-        description: 'VPD hơi cao so với mức chuẩn. Tốc độ thoát hơi nước tăng nhẹ.',
+        label: 'Hơi khô',
+        description: 'Áp lực thoát hơi nước tăng nhẹ. Cần chú ý độ ẩm giá thể.',
         color: colors.warning,
-        recommendation: 'Kiểm tra độ ẩm đất và che bớt nắng gắt buổi trưa.',
+        recommendation: 'Kiểm tra độ ẩm đất, che nắng gắt buổi trưa.',
       };
     }
     return {
       status: 'danger_high',
-      label: 'Khô hạn sinh lý',
-      description: 'VPD quá cao vượt ngưỡng chịu đựng. Khí khổng đóng tự vệ, quang hợp bị đình trệ.',
+      label: 'Quá khô',
+      description: 'VPD vượt ngưỡng an toàn. Cây co khí khổng tự vệ, đình trệ quang hợp.',
       color: colors.danger,
-      recommendation: 'Kích hoạt phun sương hạ nhiệt và che bớt nắng gắt ngay.',
+      recommendation: 'Phun sương hạ nhiệt và cấp ẩm ngay.',
     };
   }
 
@@ -81,46 +81,46 @@ export function getVPDStatus(vpd: number, targetRange?: StageThresholdRange): VP
   if (vpd < 0.4) {
     return {
       status: 'danger_low',
-      label: 'Đình trệ thoát hơi nước',
-      description: 'Không khí quá ẩm ướt (>88%). Đọng nước trên lá làm bùng phát nấm mốc phấn trắng.',
+      label: 'Quá ẩm',
+      description: 'Không khí bão hòa ẩm. Nước đọng mặt lá dễ phát sinh nấm mốc.',
       color: colors.water[500],
-      recommendation: 'Tăng cường thông gió, giảm phun sương tạo ẩm trong nhà màng.',
+      recommendation: 'Tăng cường thông gió, giảm độ ẩm vườn.',
     };
   }
   if (vpd < 0.8) {
     return {
       status: 'seedling',
-      label: 'Mát mẻ (Chuẩn cây con)',
-      description: 'Môi trường êm dịu, rễ non hút nước nhẹ nhàng, không bị sốc mất nước.',
+      label: 'Ẩm nhẹ',
+      description: 'Môi trường êm dịu, phù hợp cây con hoặc giai đoạn bén rễ.',
       color: colors.accent[500],
-      recommendation: 'Rất tốt cho ươm mầm, giâm cành hoặc cây trong 10 ngày đầu.',
+      recommendation: 'Môi trường rất tốt cho mầm non sinh trưởng.',
     };
   }
   if (vpd <= 1.2) {
     return {
       status: 'optimal',
-      label: 'Vùng quang hợp cực đại',
-      description: 'Transpiration Zone lý tưởng: Cây hô hấp và đồng hóa chất dinh dưỡng đạt năng suất tối đa.',
+      label: 'Tối ưu',
+      description: 'Vùng quang hợp cực đại: Hô hấp và hấp thu dinh dưỡng tối đa.',
       color: colors.primary[500],
-      recommendation: 'Điều kiện hoàn hảo, cây đang sinh trưởng với tốc độ tốt nhất.',
+      recommendation: 'Điều kiện lý tưởng, cây phát triển thuận lợi.',
     };
   }
   if (vpd <= 1.6) {
     return {
       status: 'stress',
-      label: 'Mất nước nhẹ (Cần chú ý)',
-      description: 'Không khí hơi khô hoặc nhiệt độ cao. Tốc độ thoát hơi nước vượt nhẹ khả năng hút rễ.',
+      label: 'Hơi khô',
+      description: 'Tốc độ bốc hơi nước tăng nhanh hơn khả năng hút nước của rễ.',
       color: colors.warning,
-      recommendation: 'Kiểm tra độ ẩm đất, tưới dặm nhẹ hoặc kéo lưới lan cách nhiệt.',
+      recommendation: 'Tưới dặm ẩm hoặc kéo lưới che bớt nắng gắt.',
     };
   }
 
   return {
     status: 'danger_high',
-    label: 'Khô hạn sinh lý cực hạn',
-    description: 'VPD quá cao (>1.6 kPa). Cây đóng khí khổng chống bốc hơi nước làm đọt rũ, cháy rìa lá non.',
+    label: 'Quá khô',
+    description: 'VPD quá cao (>1.6 kPa). Cây khép khí khổng, nguy cơ héo rũ chóp lá.',
     color: colors.danger,
-    recommendation: 'Bật hệ thống phun sương làm mát và tưới cấp ẩm bù đắp ngay lập tức.',
+    recommendation: 'Bật phun sương làm mát và tưới bù ẩm tức thì.',
   };
 }
 

@@ -98,7 +98,7 @@ function SensorCardComponent({
 
         <View style={styles.footerRow}>
           <Text style={styles.hint} numberOfLines={1}>
-            {cropTargetName ? `Chuẩn ${cropTargetName}: ` : 'Chuẩn: '}
+            Mục tiêu:{' '}
             <Text style={styles.hintTarget}>
               {targetMin} - {targetMax} {meta.unit}
             </Text>

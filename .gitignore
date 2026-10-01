@@ -33,3 +33,12 @@ yarn-error.*
 
 # typescript
 *.tsbuildinfo
+
+# firmware & secrets
+firmware/esp32_aiot_agriculture/esp32_aiot_agriculture.ino
+firmware/**/secrets.h
+firmware/**/*.bin
+firmware/**/*.elf
+firmware/**/*backup*
+firmware/hardware_diagnostics_test/
+
