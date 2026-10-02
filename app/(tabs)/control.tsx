@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Droplets, Sun, Clock, Zap, Activity, CheckCircle2, AlertCircle } from 'lucide-react-native';
+import { Droplets, Sun, Clock, Zap, Activity, CheckCircle2, AlertCircle, ShieldAlert, RotateCcw, CloudRain, Cpu } from 'lucide-react-native';
 import type { DeviceState, DeviceType } from '@/types';
 import { colors, radius, shadows, spacing, typography } from '@/constants/theme';
 import { getDevices, toggleDevice } from '@/services/api';
+import { getOutdoorWeather, type OutdoorWeather } from '@/services/weather';
 import ControlButton from '@/components/ControlButton';
 import SectionHeader from '@/components/SectionHeader';
 import { useTabVisibility } from '@/context/TabVisibilityContext';
@@ -22,12 +23,19 @@ export default function ControlScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [toggling, setToggling] = useState<DeviceType | null>(null);
   const [isMqttOnline, setIsMqttOnline] = useState(false);
+  const [operatingMode, setOperatingMode] = useState<'auto' | 'manual'>('auto');
+  const [overrideUntil, setOverrideUntil] = useState<Date | null>(null);
+  const [weather, setWeather] = useState<OutdoorWeather | null>(null);
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     try {
-      const d = await getDevices();
+      const [d, w] = await Promise.all([
+        getDevices(),
+        getOutdoorWeather().catch(() => null),
+      ]);
       setDevices(d);
+      if (w) setWeather(w);
     } catch (e: any) {
       if (isRefresh) {
         Alert.alert('Lỗi kết nối', e.message || 'Không thể lấy trạng thái thiết bị.');
@@ -66,6 +74,12 @@ export default function ControlScreen() {
   }, []);
 
   const handleToggle = useCallback(async (type: DeviceType, isOn: boolean) => {
+    // Thuật toán Smart Override giải quyết xung đột Tự động vs Nút bấm tay
+    if (operatingMode === 'auto') {
+      const overrideExp = new Date(Date.now() + 30 * 60 * 1000); // Khóa tự động trong 30 phút
+      setOverrideUntil(overrideExp);
+    }
+
     setToggling(type);
     try {
       const updated = await toggleDevice(type, isOn);
@@ -78,7 +92,17 @@ export default function ControlScreen() {
     } finally {
       setToggling(null);
     }
-  }, []);
+  }, [operatingMode]);
+
+  const isOverrideActive = Boolean(overrideUntil && overrideUntil.getTime() > Date.now());
+  const overrideTimeFormatted = overrideUntil
+    ? overrideUntil.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+    : '';
+
+  const handleResumeAuto = () => {
+    setOverrideUntil(null);
+    Alert.alert('Đã khôi phục', 'Hệ thống đã trả lại quyền điều khiển tự động hoàn toàn cho cảm biến và lịch trình.');
+  };
 
   const activeCount = devices.filter((d) => d.isOn).length;
 
@@ -111,8 +135,8 @@ export default function ControlScreen() {
         {/* Header */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.greeting}>Điều khiển từ xa</Text>
-            <Text style={styles.title}>Bảng điều khiển</Text>
+            <Text style={styles.greeting}>Chuyên Canh Dưa Lưới</Text>
+            <Text style={styles.title}>Bảng Điều Khiển Thiết Bị</Text>
           </View>
           <View
             style={[
@@ -135,6 +159,92 @@ export default function ControlScreen() {
               {isMqttOnline ? 'Cloud MQTT' : 'Mạng nội bộ'}
             </Text>
           </View>
+        </View>
+
+        {/* Chế độ Vận Hành & Khử Xung Đột (Mode Selector) */}
+        <View style={styles.modeCard}>
+          <View style={styles.modeHeader}>
+            <View style={styles.modeTitleWrap}>
+              <Cpu size={16} color={colors.primary[600]} strokeWidth={2.2} />
+              <Text style={styles.modeTitle}>Chế độ vận hành:</Text>
+            </View>
+            <View style={styles.modeToggleGroup}>
+              <Pressable
+                onPress={() => {
+                  setOperatingMode('auto');
+                  setOverrideUntil(null);
+                }}
+                style={[
+                  styles.modeBtn,
+                  operatingMode === 'auto' && styles.modeBtnActive,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.modeBtnText,
+                    operatingMode === 'auto' && styles.modeBtnTextActive,
+                  ]}
+                >
+                  TỰ ĐỘNG
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setOperatingMode('manual')}
+                style={[
+                  styles.modeBtn,
+                  operatingMode === 'manual' && styles.modeBtnActive,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.modeBtnText,
+                    operatingMode === 'manual' && styles.modeBtnTextActive,
+                  ]}
+                >
+                  THỦ CÔNG
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+
+          {/* Mô tả cơ chế chống xung đột */}
+          <Text style={styles.modeDesc}>
+            {operatingMode === 'auto'
+              ? 'Thuật toán tự động kích hoạt tưới nhỏ giọt & bù sáng theo độ ẩm và DLI. Khi nhấn nút tay, hệ thống sẽ kích hoạt Smart Override để chống xung đột.'
+              : 'Chế độ thủ công hoàn toàn: Bạn tự do đóng ngắt Relay theo ý muốn mà không bị thuật toán can thiệp.'}
+          </Text>
+
+          {/* Cảnh báo ghi đè thủ công (Manual Override Active) */}
+          {operatingMode === 'auto' && isOverrideActive && (
+            <View style={styles.overrideAlertBox}>
+              <View style={styles.overrideAlertLeft}>
+                <ShieldAlert size={16} color="#D97706" style={{ marginTop: 2 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.overrideAlertTitle}>Đang trong thời gian ghi đè (Smart Override)</Text>
+                  <Text style={styles.overrideAlertDesc}>
+                    Bạn vừa bấm nút điều khiển bằng tay. Hệ thống tự động sẽ tạm nhường quyền đến <Text style={{ fontWeight: '700' }}>{overrideTimeFormatted}</Text> để tránh xung đột lịch trình.
+                  </Text>
+                </View>
+              </View>
+              <Pressable onPress={handleResumeAuto} style={styles.resumeAutoBtn}>
+                <RotateCcw size={12} color={colors.primary[700]} />
+                <Text style={styles.resumeAutoBtnText}>Khôi phục Auto</Text>
+              </Pressable>
+            </View>
+          )}
+
+          {/* Cảnh báo khóa tưới do mưa ngoài trời */}
+          {operatingMode === 'auto' && weather && weather.rainProbability >= 60 && (
+            <View style={styles.rainLockAlertBox}>
+              <CloudRain size={16} color={colors.water[600]} style={{ marginTop: 2 }} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rainLockTitle}>🌧️ Tự động khóa tưới do thời tiết</Text>
+                <Text style={styles.rainLockDesc}>
+                  Dự báo xác suất mưa {weather.rainProbability}%. Thuật toán Smart Pump tạm ngưng chu kỳ tưới tự động để bảo vệ bầu rễ dưa khỏi ngập úng.
+                </Text>
+              </View>
+            </View>
+          )}
         </View>
 
         {/* Status summary */}
@@ -283,6 +393,129 @@ const styles = StyleSheet.create({
   liveText: {
     ...typography.caption,
     fontWeight: '700',
+  },
+  modeCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: spacing.base,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: spacing.base,
+    ...shadows.soft,
+  },
+  modeHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.xs + 3,
+  },
+  modeTitleWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  modeTitle: {
+    fontSize: 13,
+    fontFamily: 'Inter-Bold',
+    color: colors.text,
+  },
+  modeToggleGroup: {
+    flexDirection: 'row',
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.pill,
+    padding: 3,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  modeBtn: {
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+  },
+  modeBtnActive: {
+    backgroundColor: colors.primary[500],
+  },
+  modeBtnText: {
+    fontSize: 11,
+    fontFamily: 'Inter-SemiBold',
+    color: colors.textMuted,
+  },
+  modeBtnTextActive: {
+    color: '#FFFFFF',
+    fontFamily: 'Inter-Bold',
+  },
+  modeDesc: {
+    fontSize: 11,
+    fontFamily: 'Inter-Regular',
+    color: colors.textMuted,
+    lineHeight: 16,
+    marginBottom: spacing.xs + 2,
+  },
+  overrideAlertBox: {
+    backgroundColor: '#FEF3C7',
+    borderRadius: radius.md,
+    padding: spacing.sm + 2,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    marginTop: spacing.xs,
+    gap: spacing.xs + 2,
+  },
+  overrideAlertLeft: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.xs + 3,
+  },
+  overrideAlertTitle: {
+    fontSize: 11,
+    fontFamily: 'Inter-Bold',
+    color: '#92400E',
+    marginBottom: 2,
+  },
+  overrideAlertDesc: {
+    fontSize: 11,
+    fontFamily: 'Inter-Regular',
+    color: '#78350F',
+    lineHeight: 15,
+  },
+  resumeAutoBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-end',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
+    gap: 4,
+    borderWidth: 1,
+    borderColor: '#FCD34D',
+  },
+  resumeAutoBtnText: {
+    fontSize: 10,
+    fontFamily: 'Inter-Bold',
+    color: colors.primary[700],
+  },
+  rainLockAlertBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: 'rgba(59, 130, 246, 0.08)',
+    borderRadius: radius.md,
+    padding: spacing.sm + 2,
+    borderWidth: 1,
+    borderColor: 'rgba(59, 130, 246, 0.20)',
+    marginTop: spacing.xs,
+    gap: spacing.xs + 3,
+  },
+  rainLockTitle: {
+    fontSize: 11,
+    fontFamily: 'Inter-Bold',
+    color: colors.water[600],
+    marginBottom: 2,
+  },
+  rainLockDesc: {
+    fontSize: 11,
+    fontFamily: 'Inter-Regular',
+    color: colors.text,
+    lineHeight: 15,
   },
   summaryCard: {
     flexDirection: 'row',

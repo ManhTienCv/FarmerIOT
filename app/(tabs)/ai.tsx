@@ -194,8 +194,8 @@ export default function AIScreen() {
         {/* Header */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.greeting}>Phân tích môi trường & AI</Text>
-            <Text style={styles.title}>Chẩn đoán thông minh</Text>
+            <Text style={styles.greeting}>Chuyên Canh Dưa Lưới</Text>
+            <Text style={styles.title}>Trợ Lý Nông Học AI</Text>
           </View>
           <View style={styles.aiBadge}>
             <BrainCircuit size={20} color={colors.primary[500]} strokeWidth={2.2} />

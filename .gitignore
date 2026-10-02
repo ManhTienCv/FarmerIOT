@@ -42,3 +42,4 @@ firmware/**/*.elf
 firmware/**/*backup*
 firmware/hardware_diagnostics_test/
 
+firmware

@@ -59,22 +59,23 @@ THÔNG TIN VỤ MÙA ĐANG CANH TÁC:
 - Lời khuyên nông học giai đoạn này: "${stage.advisoryNote}"`;
   }
 
-  return `Bạn là một Kỹ sư Nông nghiệp Công nghệ cao (Senior Agronomist AI) tại Việt Nam.
+  return `Bạn là một Kỹ sư Nông nghiệp Trưởng chuyên sâu canh tác Dưa Lưới Nhà Màng Công Nghệ Cao (Senior Melon Agronomist AI) tại Việt Nam.
 
-Dữ liệu cảm biến thời gian thực tại vườn:
+Dữ liệu cảm biến thời gian thực tại vườn dưa lưới:
 - Nhiệt độ vườn: ${temp}°C
 - Độ ẩm không khí: ${airH}%
-- Độ ẩm đất: ${soilH}%
+- Độ ẩm đất (giá thể bầu): ${soilH}%
 - Cường độ ánh sáng: ${light} lx
 Thời tiết ngoài trời:
 ${weatherContext}
 ${cropSection}
 
-YÊU CẦU CHẨN ĐOÁN VÀ RA QUYẾT ĐỊNH NÔNG HỌC:
-1. Đánh giá trực tiếp hiện trạng vườn so với NGƯỠNG SINH HỌC CỤ THỂ của cây trồng ở giai đoạn hiện tại (KHÔNG đưa ra nhận định chung chung).
-2. Phân tích chỉ số VPD (${cropContext ? cropContext.calculatedVPD : 'tính toán'} kPa): Khí khổng đang ở vùng quang hợp cực đại hay đang chịu áp lực thoát hơi nước/đình trệ bốc hơi?
-3. Kết hợp xác suất mưa ngoài trời để đưa ra chỉ thị tưới chính xác: Nếu đất khô nhưng ngoài trời sắp mưa to (>60%), phải hướng dẫn nông dân hoãn tưới hoặc tưới cầm chừng.
-4. Đưa ra từ 2 đến 4 khuyến nghị hành động thiết thực, ngắn gọn và có tính ứng dụng cao.
+YÊU CẦU CHẨN ĐOÁN VÀ RA QUYẾT ĐỊNH NÔNG HỌC CHUYÊN SÂU DƯA LƯỚI:
+1. Đánh giá trực tiếp hiện trạng nhà màng dưa lưới so với NGƯỠNG SINH HỌC CỤ THỂ ở giai đoạn hiện tại (Đặc biệt chú ý giai đoạn thụ phấn nách lá 10-12, lên vân lưới và tạo đường Brix).
+2. Phân tích chỉ số VPD (${cropContext ? cropContext.calculatedVPD : 'tính toán'} kPa): Khí khổng đang ở vùng quang hợp cực đại hay đang chịu áp lực thoát hơi nước/đình trệ bốc hơi? Nếu độ ẩm >85% hoặc VPD <0.4 kPa, lập tức cảnh báo nguy cơ nấm phấn trắng và nứt trái.
+3. Đánh giá cường độ ánh sáng (${light} lx): Tính toán nhu cầu bù sáng bằng đèn quang hợp để đảm bảo tích phân ánh sáng hàng ngày (DLI) giúp dưa đạt độ ngọt Brix ≥ 14%.
+4. Kết hợp xác suất mưa ngoài trời để đưa ra chỉ thị tưới chính xác: Nếu ngoài trời sắp mưa to (>60%), phải hướng dẫn hệ thống Smart Pump tạm hoãn tưới để chống ngập úng bầu giá thể.
+5. Đưa ra từ 2 đến 4 khuyến nghị hành động thiết thực, ngắn gọn và có tính ứng dụng cao.
 
 BẮT BUỘC TRẢ VỀ ĐÚNG ĐỊNH DẠNG JSON SAU (không thêm markdown ngoài JSON):
 {
@@ -280,6 +281,20 @@ function getLocalHeuristicInsights(
         createdAt: now,
       });
     }
+  }
+
+  // Logic Ánh sáng (BH1750) & Tích phân quang hợp DLI chuyên sâu cho Dưa lưới
+  const lightOptMin = cropContext?.stage.light.optimalMin ?? 20000;
+  if (light < lightOptMin) {
+    insights.push({
+      id: 'light-dli-deficit',
+      title: 'Thiếu sáng, thâm hụt quang hợp DLI',
+      description: `Cường độ sáng đo được ${light} lx (ngưỡng tối ưu: ${lightOptMin} lx). Thiếu năng lượng quang hợp sẽ làm giảm độ ngọt Brix và chậm hình thành vân lưới.`,
+      level: 'warning',
+      confidence: 90,
+      recommendation: 'Kích hoạt đèn LED quang hợp bổ sung 3-4 giờ để bù đắp tích phân ánh sáng (DLI).',
+      createdAt: now,
+    });
   }
 
   // Logic nhiệt độ

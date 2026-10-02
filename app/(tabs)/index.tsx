@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { CloudRain, Droplet, Sun, Activity } from 'lucide-react-native';
+import { CloudRain, Droplet, Sun, Activity, CloudSun, ShieldAlert, Sparkles } from 'lucide-react-native';
 import type { SensorReading, SensorType } from '@/types';
 import { colors, radius, shadows, spacing, typography } from '@/constants/theme';
 import { getSensors, getSensorHistory } from '@/services/api';
 import { sensorMeta, getSensorStatus, statusLabel, statusColor } from '@/constants/sensors';
+import { getOutdoorWeather, type OutdoorWeather } from '@/services/weather';
 import SensorCard from '@/components/SensorCard';
 import SectionHeader from '@/components/SectionHeader';
 import MiniChart from '@/components/MiniChart';
@@ -24,16 +25,19 @@ export default function DashboardScreen() {
   const [selected, setSelected] = useState<SensorType>('temperature');
   const [history, setHistory] = useState<{ time: string; value: number }[]>([]);
   const [isMqttOnline, setIsMqttOnline] = useState(false);
+  const [weather, setWeather] = useState<OutdoorWeather | null>(null);
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     try {
-      const [s, h] = await Promise.all([
+      const [s, h, w] = await Promise.all([
         getSensors(),
         getSensorHistory(selected, 12),
+        getOutdoorWeather().catch(() => null),
       ]);
       setSensors(s);
       setHistory(h);
+      if (w) setWeather(w);
     } catch (e) {
       // lỗi mạng – giữ dữ liệu cũ
     } finally {
@@ -134,8 +138,8 @@ export default function DashboardScreen() {
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerTextGroup}>
-            <Text style={styles.greeting}>Nông trại thông minh</Text>
-            <Text style={styles.title}>Tổng quan hệ thống</Text>
+            <Text style={styles.greeting}>Chuyên Canh Nông Nghiệp Thông Minh</Text>
+            <Text style={styles.title}>Quản Lý Vườn Dưa Lưới</Text>
           </View>
           <View style={styles.headerBadges}>
             <View
@@ -167,6 +171,58 @@ export default function DashboardScreen() {
             </View>
           </View>
         </View>
+
+        {/* Khung Thông Báo Dự Báo Thời Tiết & Khuyến Nghị Tưới Tự Động */}
+        {weather && (
+          <View style={styles.weatherBanner}>
+            <View style={styles.weatherTopRow}>
+              <View style={styles.weatherLeft}>
+                <View style={styles.weatherIconCircle}>
+                  {weather.rainProbability >= 60 ? (
+                    <CloudRain size={20} color={colors.water[500]} strokeWidth={2.2} />
+                  ) : weather.condition === 'sunny' ? (
+                    <Sun size={20} color={colors.sun[500]} strokeWidth={2.2} />
+                  ) : (
+                    <CloudSun size={20} color={colors.primary[500]} strokeWidth={2.2} />
+                  )}
+                </View>
+                <View style={styles.weatherTextWrap}>
+                  <View style={styles.weatherCityRow}>
+                    <Text style={styles.weatherCityText}>{weather.locationName}</Text>
+                    <View style={styles.weatherBadge}>
+                      <Text style={styles.weatherBadgeText}>{weather.temperature}°C · {weather.humidity}% ẩm</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.weatherDesc} numberOfLines={1}>
+                    {weather.weatherDescription} · Xác suất mưa: {weather.rainProbability}%
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            <View
+              style={[
+                styles.irrigationAdvisoryRow,
+                weather.rainProbability >= 60 ? styles.rainLockBox : styles.normalIrrigationBox,
+              ]}
+            >
+              <View style={styles.irrigationIconWrap}>
+                {weather.rainProbability >= 60 ? (
+                  <ShieldAlert size={14} color="#D97706" />
+                ) : (
+                  <Sparkles size={14} color={colors.primary[600]} />
+                )}
+              </View>
+              <Text style={styles.irrigationAdvisoryText}>
+                {weather.rainProbability >= 60
+                  ? `Dự báo mưa cao (${weather.rainProbability}%): Thuật toán Smart Pump tạm hoãn chu kỳ tưới tiếp theo để chống ngập úng gốc dưa.`
+                  : weather.condition === 'sunny'
+                  ? `Nắng gắt lý tưởng: Tích phân quang hợp (DLI) cao, dưa đang tích lũy đường Brix tối ưu.`
+                  : `Thời tiết ổn định: Duy trì tưới nhỏ giọt theo độ ẩm giá thể thực tế.`}
+              </Text>
+            </View>
+          </View>
+        )}
 
         {/* Banner Vụ Mùa Chuyên Sâu Theo Cây Trồng */}
         <ActiveCropBanner />
@@ -390,6 +446,91 @@ const styles = StyleSheet.create({
   liveText: {
     ...typography.caption,
     fontWeight: '700',
+  },
+  weatherBanner: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: spacing.base,
+    ...shadows.soft,
+  },
+  weatherTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.xs + 4,
+  },
+  weatherLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm + 2,
+    flex: 1,
+  },
+  weatherIconCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(45,106,79,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  weatherTextWrap: {
+    flex: 1,
+  },
+  weatherCityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 2,
+  },
+  weatherCityText: {
+    fontSize: 13,
+    fontFamily: 'Inter-Bold',
+    color: colors.text,
+  },
+  weatherBadge: {
+    backgroundColor: 'rgba(45,106,79,0.10)',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: radius.pill,
+  },
+  weatherBadgeText: {
+    fontSize: 10,
+    fontFamily: 'Inter-SemiBold',
+    color: colors.primary[700],
+  },
+  weatherDesc: {
+    fontSize: 11,
+    fontFamily: 'Inter-Regular',
+    color: colors.textMuted,
+  },
+  irrigationAdvisoryRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    borderRadius: radius.md,
+    padding: spacing.sm + 2,
+    gap: spacing.xs + 3,
+    borderWidth: 1,
+  },
+  normalIrrigationBox: {
+    backgroundColor: colors.primary[50],
+    borderColor: colors.primary[200],
+  },
+  rainLockBox: {
+    backgroundColor: '#FEF3C7',
+    borderColor: '#FDE68A',
+  },
+  irrigationIconWrap: {
+    marginTop: 1,
+  },
+  irrigationAdvisoryText: {
+    fontSize: 11,
+    fontFamily: 'Inter-Medium',
+    color: colors.text,
+    lineHeight: 16,
+    flex: 1,
   },
   statsRow: {
     flexDirection: 'row',

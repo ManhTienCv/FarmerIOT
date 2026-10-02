@@ -30,8 +30,8 @@ const CropContext = createContext<CropContextType | null>(null);
 
 export function CropProvider({ children }: { children: React.ReactNode }) {
   const [selectedCrop, setSelectedCrop] = useState<CropProfile>(INITIAL_CROPS[0]);
-  const [selectedStageIndex, setSelectedStageIndex] = useState<number>(1);
-  const [dayOfCrop, setDayOfCropState] = useState<number>(12);
+  const [selectedStageIndex, setSelectedStageIndex] = useState<number>(2);
+  const [dayOfCrop, setDayOfCropState] = useState<number>(45);
   const [customCrops, setCustomCrops] = useState<CropProfile[]>([]);
   const [isGeneratingAI, setIsGeneratingAI] = useState<boolean>(false);
 

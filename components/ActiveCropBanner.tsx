@@ -37,6 +37,13 @@ export default function ActiveCropBanner({ onPressManage }: ActiveCropBannerProp
   return (
     <>
       <View style={styles.card}>
+        {/* Nhãn định vị chuyên canh dưa lưới */}
+        <View style={styles.specHeaderRow}>
+          <Text style={styles.specHeaderTag}>CHUYÊN CANH NHÀ MÀNG THÔNG MINH</Text>
+          <View style={styles.specDot} />
+          <Text style={styles.specTarget}>Mục tiêu: Brix ≥ 14%</Text>
+        </View>
+
         {/* Top bar: Cây trồng & Nút Đổi cây */}
         <View style={styles.topRow}>
           <View style={styles.cropBadge}>
@@ -166,6 +173,34 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     marginBottom: spacing.base,
     ...shadows.soft,
+  },
+  specHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.xs + 3,
+    backgroundColor: 'rgba(45,106,79,0.08)',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
+    alignSelf: 'flex-start',
+    gap: 6,
+  },
+  specHeaderTag: {
+    fontSize: 10,
+    fontFamily: 'Inter-Bold',
+    color: colors.primary[700],
+    letterSpacing: 0.5,
+  },
+  specDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: colors.primary[400],
+  },
+  specTarget: {
+    fontSize: 10,
+    fontFamily: 'Inter-SemiBold',
+    color: colors.primary[600],
   },
   topRow: {
     flexDirection: 'row',
