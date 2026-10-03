@@ -130,9 +130,12 @@ export default function ControlScreen() {
     }
   };
 
-  // Vòng lặp kiểm tra lịch tưới mỗi 20s
+  // Vòng lặp kiểm tra lịch tưới mỗi 20s (chỉ chạy khi ở chế độ TỰ ĐỘNG)
   useEffect(() => {
     const checkSchedule = async () => {
+      // Khi ở chế độ THỦ CÔNG, ngắt mọi can thiệp tự động (kể cả lịch hẹn giờ)
+      if (operatingMode !== 'auto') return;
+
       const now = new Date();
       const hh = String(now.getHours()).padStart(2, '0');
       const mm = String(now.getMinutes()).padStart(2, '0');
@@ -163,7 +166,7 @@ export default function ControlScreen() {
 
     const interval = setInterval(checkSchedule, 20000);
     return () => clearInterval(interval);
-  }, [schedules]);
+  }, [schedules, operatingMode]);
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
