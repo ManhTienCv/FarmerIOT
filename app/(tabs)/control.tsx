@@ -156,7 +156,7 @@ export default function ControlScreen() {
                 { color: isMqttOnline ? '#065F46' : '#92400E' },
               ]}
             >
-              {isMqttOnline ? 'Cloud MQTT' : 'Mạng nội bộ'}
+              {isMqttOnline ? 'Cloud' : 'Mạng nội bộ'}
             </Text>
           </View>
         </View>
@@ -299,9 +299,9 @@ export default function ControlScreen() {
             const parsedDate = new Date(d.lastToggledAt);
             const time = !isNaN(parsedDate.getTime())
               ? parsedDate.toLocaleTimeString('vi-VN', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })
+                hour: '2-digit',
+                minute: '2-digit',
+              })
               : d.lastToggledAt || 'Vừa xong';
             return (
               <View key={d.type} style={[styles.logItem, i < devices.length - 1 && styles.logItemBorder]}>

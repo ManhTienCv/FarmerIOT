@@ -160,7 +160,7 @@ export default function DashboardScreen() {
                   { color: isMqttOnline ? '#065F46' : '#92400E' },
                 ]}
               >
-                {isMqttOnline ? 'Cloud MQTT' : 'Mạng nội bộ'}
+                {isMqttOnline ? 'Cloud' : 'Mạng nội bộ'}
               </Text>
             </View>
             <View style={[styles.liveBadge, alerts.length > 0 ? styles.liveAlert : styles.liveOk]}>
@@ -217,8 +217,8 @@ export default function DashboardScreen() {
                 {weather.rainProbability >= 60
                   ? `Dự báo mưa cao (${weather.rainProbability}%): Thuật toán Smart Pump tạm hoãn chu kỳ tưới tiếp theo để chống ngập úng gốc dưa.`
                   : weather.condition === 'sunny'
-                  ? `Nắng gắt lý tưởng: Tích phân quang hợp (DLI) cao, dưa đang tích lũy đường Brix tối ưu.`
-                  : `Thời tiết ổn định: Duy trì tưới nhỏ giọt theo độ ẩm giá thể thực tế.`}
+                    ? `Nắng gắt lý tưởng: Tích phân quang hợp (DLI) cao, dưa đang tích lũy đường Brix tối ưu.`
+                    : `Thời tiết ổn định: Duy trì tưới nhỏ giọt theo độ ẩm giá thể thực tế.`}
               </Text>
             </View>
           </View>
