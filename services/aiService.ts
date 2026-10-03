@@ -75,7 +75,11 @@ YÊU CẦU CHẨN ĐOÁN VÀ RA QUYẾT ĐỊNH NÔNG HỌC CHUYÊN SÂU DƯA L�
 2. Phân tích chỉ số VPD (${cropContext ? cropContext.calculatedVPD : 'tính toán'} kPa): Khí khổng đang ở vùng quang hợp cực đại hay đang chịu áp lực thoát hơi nước/đình trệ bốc hơi? Nếu độ ẩm >85% hoặc VPD <0.4 kPa, lập tức cảnh báo nguy cơ nấm phấn trắng và nứt trái.
 3. Đánh giá cường độ ánh sáng (${light} lx): Tính toán nhu cầu bù sáng bằng đèn quang hợp để đảm bảo tích phân ánh sáng hàng ngày (DLI) giúp dưa đạt độ ngọt Brix ≥ 14%.
 4. Kết hợp xác suất mưa ngoài trời để đưa ra chỉ thị tưới chính xác: Nếu ngoài trời sắp mưa to (>60%), phải hướng dẫn hệ thống Smart Pump tạm hoãn tưới để chống ngập úng bầu giá thể.
-5. Đưa ra từ 2 đến 4 khuyến nghị hành động thiết thực, ngắn gọn và có tính ứng dụng cao.
+5. GIỚI HẠN THIẾT BỊ THỰC TẾ (BẮT BUỘC TUÂN THỦ):
+   - Nhà màng CHỈ CÓ 2 thiết bị điều khiển tự động qua Rơ-le: [1] MÁY BƠM NƯỚC (tưới nhỏ giọt/tưới gốc) và [2] ĐÈN QUANG HỢP.
+   - Nhà màng KHÔNG CÓ hệ thống phun sương tự động, KHÔNG CÓ máy tạo ẩm, KHÔNG CÓ quạt công nghiệp hay máy sưởi.
+   - MỌI KHUYẾN NGHỊ HÀNH ĐỘNG chỉ được đề xuất: Bật/tắt máy bơm tưới nước, Bật/tắt đèn quang hợp, hoặc thao tác thủ công nông hộ (kéo lưới đen che bớt nắng, cuộn mở rèm lưới đón gió tự nhiên, tưới ướt lối đi/nền nhà màng để bốc hơi tạo ẩm tự nhiên). TUYỆT ĐỐI KHÔNG khuyến nghị phun sương hay cấp ẩm bằng máy.
+6. Đưa ra từ 2 đến 4 khuyến nghị hành động thiết thực, ngắn gọn và có tính ứng dụng cao.
 
 BẮT BUỘC TRẢ VỀ ĐÚNG ĐỊNH DẠNG JSON SAU (không thêm markdown ngoài JSON):
 {
@@ -267,7 +271,7 @@ function getLocalHeuristicInsights(
         description: `VPD ${vpd} kPa quá thấp do không khí ẩm bão hòa (${airH}%). Nước đọng mặt lá dễ phát sinh nấm.`,
         level: 'warning',
         confidence: 87,
-        recommendation: 'Tăng cường lưu thông gió trong vườn, ngừng phun sương tạo ẩm.',
+        recommendation: 'Tạm ngưng bơm tưới, mở rèm lưới để đón gió tự nhiên làm khô thoáng lá.',
         createdAt: now,
       });
     } else if (vpd > 1.4) {
@@ -277,7 +281,7 @@ function getLocalHeuristicInsights(
         description: `VPD ${vpd} kPa cao hơn ngưỡng (${vpdOptMax} kPa), cây có xu hướng co cụm khí khổng để tránh mất nước.`,
         level: 'warning',
         confidence: 89,
-        recommendation: 'Phun sương nhẹ hạ nhiệt không khí và kiểm tra độ ẩm bầu rễ.',
+        recommendation: 'Bật bơm tưới giữ ẩm bầu rễ, tưới ướt lối đi nhà màng để hạ nhiệt tự nhiên.',
         createdAt: now,
       });
     }
@@ -305,7 +309,7 @@ function getLocalHeuristicInsights(
       description: `Nhiệt độ đo được ${temp}°C cao hơn ngưỡng thích hợp (${tempOptMax}°C).`,
       level: 'warning',
       confidence: 85,
-      recommendation: 'Kéo lưới lan che mát và tăng cường thông gió đối lưu.',
+      recommendation: 'Kéo lưới che bớt nắng và mở rèm lưới đón gió tự nhiên.',
       createdAt: now,
     });
   }

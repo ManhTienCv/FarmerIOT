@@ -443,8 +443,8 @@ export default function DashboardScreen() {
                         </Text>
                         <Text style={styles.notifyAdvice}>
                           💡 {status === 'low'
-                            ? (s.type === 'soilMoisture' ? 'Nên bật bơm tưới nước bù ẩm cho bầu giá thể.' : s.type === 'light' ? 'Nên bật đèn quang hợp để thúc đẩy sinh trưởng.' : 'Cần kiểm tra lại hệ thống sưởi / nhà màng.')
-                            : (s.type === 'temperature' ? 'Nên mở quạt thông gió hoặc tưới phun sương làm mát.' : s.type === 'soilMoisture' ? 'Tạm ngưng tưới để tránh nứt thân / ngập úng.' : 'Cần thông gió giảm ẩm nhà màng.')}
+                            ? (s.type === 'soilMoisture' ? 'Nên bật bơm tưới nước bù ẩm cho bầu giá thể.' : s.type === 'light' ? 'Nên bật đèn quang hợp để thúc đẩy sinh trưởng.' : 'Mở rèm lưới đón nắng ấm tự nhiên.')
+                            : (s.type === 'temperature' ? 'Kéo lưới che bớt nắng hoặc tưới ướt lối đi để hạ nhiệt.' : s.type === 'soilMoisture' ? 'Tạm ngưng tưới để tránh nứt thân / ngập úng.' : 'Mở rèm lưới để nhà màng thông thoáng tự nhiên.')}
                         </Text>
                       </View>
                     </View>

@@ -38,7 +38,7 @@ export function getVPDStatus(vpd: number, targetRange?: StageThresholdRange): VP
         label: 'Quá ẩm',
         description: 'VPD quá thấp. Khí khổng khó thoát hơi nước để luân chuyển Canxi.',
         color: colors.water[500],
-        recommendation: 'Bật thông gió, ngưng tưới phun sương để giảm ẩm.',
+        recommendation: 'Tạm ngưng bơm tưới, mở rèm lưới nhà màng để đón gió tự nhiên.',
       };
     }
     if (vpd < targetRange.optimalMin) {
@@ -47,7 +47,7 @@ export function getVPDStatus(vpd: number, targetRange?: StageThresholdRange): VP
         label: 'Ẩm nhẹ',
         description: 'VPD dưới mức tối ưu, thích hợp giai đoạn cây con hoặc trời mát.',
         color: colors.accent[500],
-        recommendation: 'Duy trì thông thoáng khí tự nhiên trong vườn.',
+        recommendation: 'Duy trì thông thoáng khí tự nhiên trong nhà màng.',
       };
     }
     if (vpd <= targetRange.optimalMax) {
@@ -56,7 +56,7 @@ export function getVPDStatus(vpd: number, targetRange?: StageThresholdRange): VP
         label: 'Tối ưu',
         description: 'Khí khổng mở lý tưởng, quang hợp và hút dinh dưỡng đạt hiệu suất cao nhất.',
         color: colors.primary[500],
-        recommendation: 'Duy trì ổn định môi trường hiện tại.',
+        recommendation: 'Môi trường tối ưu, duy trì chu kỳ tưới định kỳ.',
       };
     }
     if (vpd <= targetRange.max) {
@@ -65,7 +65,7 @@ export function getVPDStatus(vpd: number, targetRange?: StageThresholdRange): VP
         label: 'Hơi khô',
         description: 'Áp lực thoát hơi nước tăng nhẹ. Cần chú ý độ ẩm giá thể.',
         color: colors.warning,
-        recommendation: 'Kiểm tra độ ẩm đất, che nắng gắt buổi trưa.',
+        recommendation: 'Bật bơm tưới bù ẩm gốc hoặc kéo lưới che bớt nắng gắt.',
       };
     }
     return {
@@ -73,7 +73,7 @@ export function getVPDStatus(vpd: number, targetRange?: StageThresholdRange): VP
       label: 'Quá khô',
       description: 'VPD vượt ngưỡng an toàn. Cây co khí khổng tự vệ, đình trệ quang hợp.',
       color: colors.danger,
-      recommendation: 'Phun sương hạ nhiệt và cấp ẩm ngay.',
+      recommendation: 'Bật bơm tưới giữ ẩm bầu rễ, tưới ướt nền nhà màng để tăng ẩm tự nhiên.',
     };
   }
 
@@ -84,7 +84,7 @@ export function getVPDStatus(vpd: number, targetRange?: StageThresholdRange): VP
       label: 'Quá ẩm',
       description: 'Không khí bão hòa ẩm. Nước đọng mặt lá dễ phát sinh nấm mốc.',
       color: colors.water[500],
-      recommendation: 'Tăng cường thông gió, giảm độ ẩm vườn.',
+      recommendation: 'Tạm ngưng bơm tưới, mở rèm lưới cho gió lùa tự nhiên.',
     };
   }
   if (vpd < 0.8) {
@@ -93,7 +93,7 @@ export function getVPDStatus(vpd: number, targetRange?: StageThresholdRange): VP
       label: 'Ẩm nhẹ',
       description: 'Môi trường êm dịu, phù hợp cây con hoặc giai đoạn bén rễ.',
       color: colors.accent[500],
-      recommendation: 'Môi trường rất tốt cho mầm non sinh trưởng.',
+      recommendation: 'Môi trường tốt, duy trì nhà màng thông thoáng.',
     };
   }
   if (vpd <= 1.2) {
@@ -111,7 +111,7 @@ export function getVPDStatus(vpd: number, targetRange?: StageThresholdRange): VP
       label: 'Hơi khô',
       description: 'Tốc độ bốc hơi nước tăng nhanh hơn khả năng hút nước của rễ.',
       color: colors.warning,
-      recommendation: 'Tưới dặm ẩm hoặc kéo lưới che bớt nắng gắt.',
+      recommendation: 'Bật máy bơm tưới bù ẩm gốc hoặc kéo lưới che nắng.',
     };
   }
 
@@ -120,7 +120,7 @@ export function getVPDStatus(vpd: number, targetRange?: StageThresholdRange): VP
     label: 'Quá khô',
     description: 'VPD quá cao (>1.6 kPa). Cây khép khí khổng, nguy cơ héo rũ chóp lá.',
     color: colors.danger,
-    recommendation: 'Bật phun sương làm mát và tưới bù ẩm tức thì.',
+    recommendation: 'Bật bơm tưới gốc ngay, tưới ướt lối đi nhà màng để hạ nhiệt.',
   };
 }
 
