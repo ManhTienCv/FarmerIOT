@@ -53,20 +53,24 @@
 ```mermaid
 graph TD
     subgraph "1. Lớp Thiết Bị Biên (Edge / Hardware)"
-        ESP32["Vi điều khiển ESP32"]
-        SHT31["Cảm biến Nhiệt Ẩm SHT31 (I2C-1 / 3.3V)"]
-        BH1750["Cảm biến Ánh sáng BH1750 (I2C-1 / 3.3V)"]
-        SOIL["Cảm biến Độ ẩm đất (Analog)"]
-        LCD["Màn hình LCD 1602 (I2C-0 / 5V)"]
-        RELAY["Module Relay Cách Ly Quang (JD-VCC 5V)"]
+        ESP32["Vi điều khiển ESP32 WROOM-32"]
+        DHT["Cảm biến Nhiệt Ẩm DHT11 / DHT22 (1-Wire GPIO 4)"]
+        LDR1["Quang trở LDR 1 - Đỉnh tán lá (Analog GPIO 34 - ADC1)"]
+        LDR2["Quang trở LDR 2 - Tầng quả (Analog GPIO 33 - ADC1)"]
+        RAIN["Cảm biến Mưa Raindrops (Digital DO GPIO 32)"]
+        SOIL["Cảm biến Độ ẩm đất (Analog GPIO 35 - ADC1)"]
+        LCD["Màn hình LCD 1602 I2C (SDA 21 / SCL 22)"]
+        RELAY["Module Relay Cách Ly 2 Kênh (GPIO 26 / 27)"]
         PUMP["Máy bơm tưới nhỏ giọt"]
-        LIGHT["Đèn LED quang hợp"]
+        LIGHT["Đèn LED quang hợp chuyên dụng"]
         
-        ESP32 -->|I2C-1| SHT31
-        ESP32 -->|I2C-1| BH1750
-        ESP32 -->|ADC| SOIL
-        ESP32 -->|I2C-0| LCD
-        ESP32 -->|GPIO| RELAY
+        ESP32 -->|1-Wire| DHT
+        ESP32 -->|ADC1| LDR1
+        ESP32 -->|ADC1| LDR2
+        ESP32 -->|ADC1| SOIL
+        ESP32 -->|GPIO In| RAIN
+        ESP32 -->|I2C| LCD
+        ESP32 -->|GPIO Out| RELAY
         RELAY --> PUMP
         RELAY --> LIGHT
     end
