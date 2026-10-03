@@ -36,9 +36,9 @@ export default function ActiveCropBanner({ onPressManage }: ActiveCropBannerProp
       <View style={styles.card}>
         {/* Nhãn định vị chuyên canh dưa lưới */}
         <View style={styles.specHeaderRow}>
-          <Text style={styles.specHeaderTag}>CHUYÊN CANH NHÀ MÀNG THÔNG MINH</Text>
+          <Text style={styles.specHeaderTag}>DƯA LƯỚI NHÀ MÀNG</Text>
           <View style={styles.specDot} />
-          <Text style={styles.specTarget}>Mục tiêu: Brix ≥ 14%</Text>
+          <Text style={styles.specTarget}>Brix ≥ 14%</Text>
         </View>
 
         {/* Top bar: Cây trồng & Nút Đổi cây */}

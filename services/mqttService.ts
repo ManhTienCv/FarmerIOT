@@ -314,6 +314,22 @@ export async function sendMqttDeviceCommand(type: DeviceType, isOn: boolean): Pr
   }
 }
 
+export async function sendMqttModeCommand(mode: 'auto' | 'manual'): Promise<boolean> {
+  if (!client || !isConnected) return false;
+  try {
+    const topic = `${TOPIC_CONTROL_PREFIX}mode`;
+    const payload = JSON.stringify({ mode, sender: 'app' });
+    const message = new Paho.Message(payload);
+    message.destinationName = topic;
+    message.qos = 1;
+    client.send(message);
+    return true;
+  } catch (err) {
+    console.error('[MQTT] Lỗi gửi chế độ hoạt động:', err);
+    return false;
+  }
+}
+
 // ============================================================
 // HÀM ĐĂNG KÝ LISTENER DÀNH CHO REACT COMPONENTS
 // ============================================================

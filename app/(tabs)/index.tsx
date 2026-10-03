@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { CloudRain, Droplet, Sun, Activity, CloudSun, ShieldAlert, Sparkles } from 'lucide-react-native';
+import { CloudRain, Droplet, Sun, Activity, CloudSun, ShieldAlert, Sparkles, Bell, X, CheckCircle2, AlertTriangle } from 'lucide-react-native';
 import type { SensorReading, SensorType } from '@/types';
 import { colors, radius, shadows, spacing, typography } from '@/constants/theme';
 import { getSensors, getSensorHistory } from '@/services/api';
@@ -26,6 +26,7 @@ export default function DashboardScreen() {
   const [history, setHistory] = useState<{ time: string; value: number }[]>([]);
   const [isMqttOnline, setIsMqttOnline] = useState(false);
   const [weather, setWeather] = useState<OutdoorWeather | null>(null);
+  const [notifyModalVisible, setNotifyModalVisible] = useState(false);
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -138,8 +139,8 @@ export default function DashboardScreen() {
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerTextGroup}>
-            <Text style={styles.greeting}>Chuyên Canh Nông Nghiệp Thông Minh</Text>
-            <Text style={styles.title}>Quản Lý Vườn Dưa Lưới</Text>
+            <Text style={styles.greeting}>Nhà Màng Thông Minh</Text>
+            <Text style={styles.title}>Vườn Dưa Lưới</Text>
           </View>
           <View style={styles.headerBadges}>
             <View
@@ -160,15 +161,23 @@ export default function DashboardScreen() {
                   { color: isMqttOnline ? '#065F46' : '#92400E' },
                 ]}
               >
-                {isMqttOnline ? 'Cloud' : 'Mạng nội bộ'}
+                {isMqttOnline ? 'Cloud' : 'Offline'}
               </Text>
             </View>
-            <View style={[styles.liveBadge, alerts.length > 0 ? styles.liveAlert : styles.liveOk]}>
-              <View style={[styles.liveDot, { backgroundColor: alerts.length > 0 ? colors.danger : colors.success }]} />
-              <Text style={[styles.liveText, { color: alerts.length > 0 ? colors.danger : colors.success }]}>
-                {alerts.length > 0 ? `${alerts.length} cảnh báo` : 'Ổn định'}
-              </Text>
-            </View>
+
+            {/* Logo Chuông Thông Báo */}
+            <Pressable
+              style={styles.bellBtn}
+              onPress={() => setNotifyModalVisible(true)}
+              hitSlop={8}
+            >
+              <Bell size={20} color={colors.text} />
+              {alerts.length > 0 && (
+                <View style={styles.bellBadge}>
+                  <Text style={styles.bellBadgeText}>{alerts.length}</Text>
+                </View>
+              )}
+            </Pressable>
           </View>
         </View>
 
@@ -373,6 +382,91 @@ export default function DashboardScreen() {
 
         <View style={{ height: spacing.xl }} />
       </ScrollView>
+
+      {/* Notification Modal */}
+      <Modal
+        visible={notifyModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setNotifyModalVisible(false)}
+      >
+        <Pressable
+          style={styles.notifyModalOverlay}
+          onPress={() => setNotifyModalVisible(false)}
+        >
+          <Pressable style={styles.notifyModalContent} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.notifyModalHeader}>
+              <View style={styles.notifyHeaderTitleRow}>
+                <Bell size={20} color={colors.primary[600]} />
+                <Text style={styles.notifyModalTitle}>Thông Báo & Khuyến Nghị</Text>
+              </View>
+              <Pressable
+                onPress={() => setNotifyModalVisible(false)}
+                style={styles.notifyCloseBtn}
+                hitSlop={8}
+              >
+                <X size={20} color={colors.textMuted} />
+              </Pressable>
+            </View>
+
+            <ScrollView style={styles.notifyList} showsVerticalScrollIndicator={false}>
+              {alerts.length === 0 ? (
+                <View style={styles.notifyEmptyBox}>
+                  <CheckCircle2 size={36} color={colors.success} />
+                  <Text style={styles.notifyEmptyTitle}>Nhà màng ổn định</Text>
+                  <Text style={styles.notifyEmptyDesc}>
+                    Mọi chỉ số môi trường đều nằm trong ngưỡng tối ưu cho Dưa Lưới ({currentStage.name}).
+                  </Text>
+                </View>
+              ) : (
+                alerts.map((s) => {
+                  const meta = sensorMeta[s.type];
+                  const range = getStageRange(s.type);
+                  const optMin = range ? range.optimalMin : s.optimalMin;
+                  const optMax = range ? range.optimalMax : s.optimalMax;
+                  const status = getSensorStatus(s.value, optMin, optMax);
+                  const Icon = meta.icon;
+                  return (
+                    <View key={s.type} style={[styles.notifyAlertCard, { borderLeftColor: statusColor[status] }]}>
+                      <View style={[styles.notifyAlertIcon, { backgroundColor: `${statusColor[status]}18` }]}>
+                        <Icon size={18} color={statusColor[status]} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <View style={styles.notifyRow}>
+                          <Text style={styles.notifySensorName}>{meta.label}</Text>
+                          <Text style={[styles.notifyStatusTag, { color: statusColor[status] }]}>
+                            {status === 'low' ? 'Thấp hơn chuẩn' : 'Cao hơn chuẩn'}
+                          </Text>
+                        </View>
+                        <Text style={styles.notifyDetail}>
+                          Hiện tại: <Text style={{ fontWeight: '700' }}>{s.value.toFixed(meta.decimals)}{meta.unit}</Text> (Chuẩn: {optMin} - {optMax}{meta.unit})
+                        </Text>
+                        <Text style={styles.notifyAdvice}>
+                          💡 {status === 'low'
+                            ? (s.type === 'soilMoisture' ? 'Nên bật bơm tưới nước bù ẩm cho bầu giá thể.' : s.type === 'light' ? 'Nên bật đèn quang hợp để thúc đẩy sinh trưởng.' : 'Cần kiểm tra lại hệ thống sưởi / nhà màng.')
+                            : (s.type === 'temperature' ? 'Nên mở quạt thông gió hoặc tưới phun sương làm mát.' : s.type === 'soilMoisture' ? 'Tạm ngưng tưới để tránh nứt thân / ngập úng.' : 'Cần thông gió giảm ẩm nhà màng.')}
+                        </Text>
+                      </View>
+                    </View>
+                  );
+                })
+              )}
+
+              {weather && weather.rainProbability >= 60 && (
+                <View style={styles.notifyWeatherBox}>
+                  <CloudRain size={20} color={colors.water[500]} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.notifyWeatherTitle}>Thời tiết có mưa ({weather.rainProbability}%)</Text>
+                    <Text style={styles.notifyWeatherDesc}>
+                      Hệ thống tự động điều chỉnh chu kỳ tưới để tránh thừa ẩm trong bầu rễ.
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -675,5 +769,156 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     textAlign: 'center',
     fontStyle: 'italic',
+  },
+  bellBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+    position: 'relative',
+    ...shadows.soft,
+  },
+  bellBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: colors.danger,
+    borderRadius: 9,
+    minWidth: 18,
+    height: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 1.5,
+    borderColor: colors.surface,
+  },
+  bellBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontFamily: 'Inter-Bold',
+  },
+  notifyModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.base,
+  },
+  notifyModalContent: {
+    width: '100%',
+    maxHeight: '80%',
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    padding: spacing.base,
+    ...shadows.card,
+  },
+  notifyModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingBottom: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    marginBottom: spacing.md,
+  },
+  notifyHeaderTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs + 2,
+  },
+  notifyModalTitle: {
+    ...typography.h3,
+    color: colors.text,
+  },
+  notifyCloseBtn: {
+    padding: spacing.xs,
+  },
+  notifyList: {
+    maxHeight: 400,
+  },
+  notifyEmptyBox: {
+    alignItems: 'center',
+    paddingVertical: spacing.xl,
+    gap: spacing.sm,
+  },
+  notifyEmptyTitle: {
+    ...typography.h3,
+    color: colors.success,
+  },
+  notifyEmptyDesc: {
+    ...typography.bodySm,
+    color: colors.textMuted,
+    textAlign: 'center',
+    lineHeight: 20,
+    paddingHorizontal: spacing.md,
+  },
+  notifyAlertCard: {
+    flexDirection: 'row',
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    borderLeftWidth: 3,
+    gap: spacing.sm + 2,
+    marginBottom: spacing.sm,
+  },
+  notifyAlertIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: radius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  notifyRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 2,
+  },
+  notifySensorName: {
+    ...typography.body,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  notifyStatusTag: {
+    fontSize: 11,
+    fontFamily: 'Inter-SemiBold',
+  },
+  notifyDetail: {
+    ...typography.caption,
+    color: colors.textMuted,
+    marginBottom: 4,
+  },
+  notifyAdvice: {
+    fontSize: 11,
+    fontFamily: 'Inter-Regular',
+    color: colors.primary[700],
+    lineHeight: 16,
+  },
+  notifyWeatherBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm + 2,
+    backgroundColor: 'rgba(56, 189, 248, 0.08)',
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginTop: spacing.xs,
+    borderWidth: 1,
+    borderColor: 'rgba(56, 189, 248, 0.2)',
+  },
+  notifyWeatherTitle: {
+    fontSize: 12,
+    fontFamily: 'Inter-SemiBold',
+    color: colors.water[600],
+    marginBottom: 2,
+  },
+  notifyWeatherDesc: {
+    fontSize: 11,
+    fontFamily: 'Inter-Regular',
+    color: colors.textMuted,
+    lineHeight: 16,
   },
 });
