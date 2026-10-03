@@ -45,6 +45,7 @@ import {
   subscribeConnection,
   sendMqttDeviceCommand,
   sendMqttModeCommand,
+  sendMqttRainLock,
 } from '@/services/mqttService';
 
 export interface IrrigationSchedule {
@@ -59,24 +60,7 @@ export interface IrrigationSchedule {
 const STORAGE_KEY_SCHEDULES = '@aiot_irrigation_schedules';
 const DAY_LABELS = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
 
-const DEFAULT_SCHEDULES: IrrigationSchedule[] = [
-  {
-    id: 'sched-1',
-    time: '07:00',
-    durationMinutes: 3,
-    days: [1, 2, 3, 4, 5, 6, 0],
-    isEnabled: true,
-    label: 'Tưới sáng nhỏ giọt',
-  },
-  {
-    id: 'sched-2',
-    time: '16:30',
-    durationMinutes: 3,
-    days: [1, 2, 3, 4, 5, 6, 0],
-    isEnabled: true,
-    label: 'Tưới chiều mát',
-  },
-];
+const DEFAULT_SCHEDULES: IrrigationSchedule[] = [];
 
 const deviceConfig: Record<DeviceType, { icon: typeof Droplets; accent: string; desc: string }> = {
   pump: { icon: Droplets, accent: colors.water[500], desc: 'Bơm nước tưới' },
@@ -213,6 +197,14 @@ export default function ControlScreen() {
       unsubConn();
     };
   }, []);
+
+  // Đồng bộ khóa trời mưa từ dự báo thời tiết OpenWeather xuống phần cứng ESP32 qua MQTT
+  useEffect(() => {
+    if (isMqttOnline && weather) {
+      const isRainLikely = weather.rainProbability >= 60;
+      sendMqttRainLock(isRainLikely);
+    }
+  }, [isMqttOnline, weather]);
 
   const handleToggle = useCallback(async (type: DeviceType, isOn: boolean) => {
     // Thuật toán Smart Override giải quyết xung đột Tự động vs Nút bấm tay

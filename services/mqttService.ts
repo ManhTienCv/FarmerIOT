@@ -330,6 +330,22 @@ export async function sendMqttModeCommand(mode: 'auto' | 'manual'): Promise<bool
   }
 }
 
+export async function sendMqttRainLock(rainLock: boolean): Promise<boolean> {
+  if (!client || !isConnected) return false;
+  try {
+    const topic = `${TOPIC_CONTROL_PREFIX}rainLock`;
+    const payload = JSON.stringify({ rainLock, sender: 'app' });
+    const message = new Paho.Message(payload);
+    message.destinationName = topic;
+    message.qos = 1;
+    client.send(message);
+    return true;
+  } catch (err) {
+    console.error('[MQTT] Lỗi gửi khóa mưa:', err);
+    return false;
+  }
+}
+
 // ============================================================
 // HÀM ĐĂNG KÝ LISTENER DÀNH CHO REACT COMPONENTS
 // ============================================================

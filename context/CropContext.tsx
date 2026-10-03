@@ -30,8 +30,8 @@ const CropContext = createContext<CropContextType | null>(null);
 
 export function CropProvider({ children }: { children: React.ReactNode }) {
   const [selectedCrop, setSelectedCrop] = useState<CropProfile>(INITIAL_CROPS[0]);
-  const [selectedStageIndex, setSelectedStageIndex] = useState<number>(2);
-  const [dayOfCrop, setDayOfCropState] = useState<number>(45);
+  const [selectedStageIndex, setSelectedStageIndex] = useState<number>(0);
+  const [dayOfCrop, setDayOfCropState] = useState<number>(1);
   const [customCrops, setCustomCrops] = useState<CropProfile[]>([]);
   const [isGeneratingAI, setIsGeneratingAI] = useState<boolean>(false);
 
@@ -54,28 +54,24 @@ export function CropProvider({ children }: { children: React.ReactNode }) {
           } catch (e) {}
         }
 
-        const pool = [...INITIAL_CROPS, ...loadedCustom];
-        // Đề tài chuyên canh Dưa Lưới: Luôn khóa mặc định dưa lưới công nghệ cao
+        // Đề tài chuyên canh Dưa Lưới
         let targetCrop = INITIAL_CROPS[0];
-        if (savedCropId && savedCropId === 'dua-luoi') {
-          targetCrop = INITIAL_CROPS[0];
-        } else {
-          // Xóa cache cũ nếu từng lưu rau muống, cà chua...
-          AsyncStorage.setItem(STORAGE_KEY_SELECTED_CROP_ID, 'dua-luoi').catch(() => {});
-          AsyncStorage.setItem(STORAGE_KEY_STAGE_INDEX, '2').catch(() => {});
-          AsyncStorage.setItem(STORAGE_KEY_DAY_OF_CROP, '45').catch(() => {});
-        }
         setSelectedCrop(targetCrop);
 
         if (savedStage !== null) {
           const parsed = Number(savedStage);
           const maxIdx = Math.max(0, (targetCrop.stages?.length ?? 1) - 1);
           setSelectedStageIndex(isNaN(parsed) ? 0 : Math.min(Math.max(0, parsed), maxIdx));
+        } else {
+          setSelectedStageIndex(0);
         }
+
         if (savedDay !== null) {
           const parsed = Number(savedDay);
-          const maxDay = targetCrop.totalDays || 30;
+          const maxDay = targetCrop.totalDays || 75;
           setDayOfCropState(isNaN(parsed) ? 1 : Math.min(Math.max(1, parsed), maxDay));
+        } else {
+          setDayOfCropState(1);
         }
       } catch (err) {
         console.warn('Lỗi khi nạp dữ liệu cây trồng từ Storage:', err);
