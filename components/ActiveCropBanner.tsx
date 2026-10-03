@@ -11,7 +11,6 @@ import {
 } from 'lucide-react-native';
 import { colors, radius, shadows, spacing, typography } from '@/constants/theme';
 import { useCrop } from '@/context/CropContext';
-import CropSelectorModal from './CropSelectorModal';
 
 interface ActiveCropBannerProps {
   onPressManage?: () => void;
@@ -26,8 +25,6 @@ export default function ActiveCropBanner({ onPressManage }: ActiveCropBannerProp
     setStageIndex,
     setDayOfCrop,
   } = useCrop();
-
-  const [modalVisible, setModalVisible] = useState(false);
 
   const progressPercent = Math.min(
     Math.round((dayOfCrop / (selectedCrop.totalDays || 1)) * 100),
@@ -68,13 +65,10 @@ export default function ActiveCropBanner({ onPressManage }: ActiveCropBannerProp
             </View>
           </View>
 
-          <Pressable
-            onPress={() => setModalVisible(true)}
-            style={({ pressed }) => [styles.switchBtn, pressed && styles.pressed]}
-          >
-            <SlidersHorizontal size={14} color={colors.primary[600]} strokeWidth={2.2} />
-            <Text style={styles.switchBtnText}>Đổi cây</Text>
-          </Pressable>
+          <View style={styles.greenhousePill}>
+            <View style={styles.greenhouseDot} />
+            <Text style={styles.greenhousePillText}>Nhà Màng #01</Text>
+          </View>
         </View>
 
         {/* Thanh tiến độ ngày trồng */}
@@ -154,12 +148,6 @@ export default function ActiveCropBanner({ onPressManage }: ActiveCropBannerProp
           </View>
         )}
       </View>
-
-      {/* Modal tìm kiếm & chọn cây trồng E-Commerce */}
-      <CropSelectorModal
-        visible={modalVisible}
-        onClose={() => setModalVisible(false)}
-      />
     </>
   );
 }
@@ -260,25 +248,28 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     marginTop: 1,
   },
-  switchBtn: {
+  greenhousePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surfaceAlt,
+    backgroundColor: colors.primary[50],
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs + 3,
+    paddingVertical: spacing.xs + 2,
     borderRadius: radius.pill,
     borderWidth: 1,
-    borderColor: colors.border,
-    gap: 5,
+    borderColor: colors.primary[200],
+    gap: 6,
   },
-  switchBtnText: {
-    fontSize: 12,
-    fontFamily: 'Inter-SemiBold',
-    color: colors.primary[600],
+  greenhouseDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.primary[600],
   },
-  pressed: {
-    opacity: 0.8,
-    transform: [{ scale: 0.98 }],
+  greenhousePillText: {
+    fontSize: 11,
+    fontFamily: 'Inter-Bold',
+    color: colors.primary[700],
+    letterSpacing: 0.3,
   },
   progressSection: {
     backgroundColor: colors.surfaceAlt,

@@ -55,14 +55,17 @@ export function CropProvider({ children }: { children: React.ReactNode }) {
         }
 
         const pool = [...INITIAL_CROPS, ...loadedCustom];
+        // Đề tài chuyên canh Dưa Lưới: Luôn khóa mặc định dưa lưới công nghệ cao
         let targetCrop = INITIAL_CROPS[0];
-        if (savedCropId) {
-          const found = pool.find((c) => c.id === savedCropId);
-          if (found) {
-            targetCrop = found;
-            setSelectedCrop(found);
-          }
+        if (savedCropId && savedCropId === 'dua-luoi') {
+          targetCrop = INITIAL_CROPS[0];
+        } else {
+          // Xóa cache cũ nếu từng lưu rau muống, cà chua...
+          AsyncStorage.setItem(STORAGE_KEY_SELECTED_CROP_ID, 'dua-luoi').catch(() => {});
+          AsyncStorage.setItem(STORAGE_KEY_STAGE_INDEX, '2').catch(() => {});
+          AsyncStorage.setItem(STORAGE_KEY_DAY_OF_CROP, '45').catch(() => {});
         }
+        setSelectedCrop(targetCrop);
 
         if (savedStage !== null) {
           const parsed = Number(savedStage);
