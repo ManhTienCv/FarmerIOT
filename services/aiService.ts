@@ -335,8 +335,30 @@ export async function analyzeAgricultureData(
   weather?: OutdoorWeather,
   cropContext?: PrecisionCropContext
 ): Promise<AIAnalysisResult> {
-  const prompt = buildPrompt(sensors, weather, cropContext);
   const now = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+
+  // Tuyệt đối không suy đoán khi chưa có dữ liệu cảm biến thực tế từ phần cứng
+  if (!sensors || sensors.length === 0) {
+    return {
+      insights: [
+        {
+          id: 'awaiting_hardware',
+          title: 'Đang đợi dữ liệu cảm biến thực tế',
+          description: `Hệ thống AI đã ngắt hoàn toàn dữ liệu giả định và đang đợi kết nối từ ESP32 để chẩn đoán cho cây ${cropContext?.crop.name || 'Dưa Lưới'} (${cropContext?.stage.name || 'Chuyên Canh'}).`,
+          level: 'info',
+          confidence: 100,
+          recommendation: 'Hãy cấp nguồn cho ESP32 ngoài vườn. Ngay khi có số đo thực tế, AI sẽ tự động phân tích.',
+          createdAt: 'Chờ kết nối',
+        },
+      ],
+      provider: 'local',
+      providerName: 'Chờ phần cứng',
+      weather,
+      timestamp: now,
+    };
+  }
+
+  const prompt = buildPrompt(sensors, weather, cropContext);
 
   // 1. Thử Gemini trước
   try {

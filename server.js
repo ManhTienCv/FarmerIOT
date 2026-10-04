@@ -119,11 +119,25 @@ mqttClient.on('message', async (topic, payload) => {
 
     // Gói tin cảm biến từ ESP32 -> Lưu vào sensor_telemetry
     if (topic === 'farm/sensors') {
-      const temp = data.temperature != null ? Number(data.temperature) : null;
-      const hum = data.airHumidity != null ? Number(data.airHumidity) : null;
-      const soil = data.soilMoisture != null ? Number(data.soilMoisture) : null;
-      const light = data.light != null ? Number(data.light) : null;
-      const recordedAt = data.updatedAt || new Date().toISOString();
+      let temp = null, hum = null, soil = null, light = null;
+      if (Array.isArray(data)) {
+        const findVal = (t) => data.find((x) => x && x.type === t)?.value;
+        temp = findVal('temperature') != null ? Number(findVal('temperature')) : null;
+        hum = findVal('airHumidity') != null ? Number(findVal('airHumidity')) : null;
+        soil = findVal('soilMoisture') != null ? Number(findVal('soilMoisture')) : null;
+        light = findVal('light') != null ? Number(findVal('light')) : null;
+      } else if (data && typeof data === 'object') {
+        temp = data.temperature != null ? Number(data.temperature) : null;
+        hum = data.airHumidity != null ? Number(data.airHumidity) : null;
+        soil = data.soilMoisture != null ? Number(data.soilMoisture) : null;
+        light = data.light != null ? Number(data.light) : null;
+      }
+
+      if (temp == null && hum == null && soil == null && light == null) {
+        return;
+      }
+
+      const recordedAt = (data && !Array.isArray(data) && data.updatedAt) || new Date().toISOString();
 
       console.log(`[ESP32 -> Backend] Nhiệt độ=${temp}°C, Độ ẩm=${hum}%, Độ ẩm đất=${soil}%, Ánh sáng=${light}lx`);
 

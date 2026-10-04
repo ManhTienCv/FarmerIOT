@@ -15,10 +15,12 @@ import {
   sendMqttDeviceCommand,
   isMqttActive,
 } from '@/services/mqttService';
-import { getStoredSensors, getStoredDevices } from '@/services/historyStorage';
+import { getStoredSensors, getStoredDevices, clearAllStoredData } from '@/services/historyStorage';
 import { fetchSensorHistory } from '@/services/databaseService';
 import { analyzeAgricultureData, type AIAnalysisResult, type PrecisionCropContext } from '@/services/aiService';
 import type { OutdoorWeather } from '@/services/weather';
+
+export { clearAllStoredData };
 
 // ============================================================
 // CẤU HÌNH KẾT NỐI BACKEND

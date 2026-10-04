@@ -69,6 +69,7 @@ function notifyConnection(status: boolean) {
 }
 
 function notifySensors(sensors: SensorReading[]) {
+  if (!sensors || sensors.length === 0) return;
   latestSensors = sensors;
   saveRealSensors(sensors).catch(() => {});
   logSensorTelemetryToDatabase(sensors).catch(() => {});
@@ -119,51 +120,66 @@ getStoredDevices()
 // ============================================================
 export function parseSensorPayload(raw: any): SensorReading[] {
   if (Array.isArray(raw)) {
-    return raw;
+    return raw.filter(
+      (item) => item && typeof item.type === 'string' && typeof item.value === 'number'
+    );
+  }
+  if (!raw || typeof raw !== 'object') {
+    return [];
   }
   const now = raw.updatedAt || new Date().toISOString();
-  return [
-    {
+  const list: SensorReading[] = [];
+
+  if (typeof raw.temperature === 'number') {
+    list.push({
       type: 'temperature',
-      value: typeof raw.temperature === 'number' ? Number(raw.temperature.toFixed(1)) : 28.0,
+      value: Number(raw.temperature.toFixed(1)),
       unit: '°C',
       min: 0,
       max: 50,
       optimalMin: 22,
       optimalMax: 32,
       updatedAt: now,
-    },
-    {
+    });
+  }
+  if (typeof raw.airHumidity === 'number') {
+    list.push({
       type: 'airHumidity',
-      value: typeof raw.airHumidity === 'number' ? Math.round(raw.airHumidity) : 75,
+      value: Math.round(raw.airHumidity),
       unit: '%',
       min: 0,
       max: 100,
       optimalMin: 60,
       optimalMax: 80,
       updatedAt: now,
-    },
-    {
+    });
+  }
+  if (typeof raw.soilMoisture === 'number') {
+    list.push({
       type: 'soilMoisture',
-      value: typeof raw.soilMoisture === 'number' ? Math.round(raw.soilMoisture) : 60,
+      value: Math.round(raw.soilMoisture),
       unit: '%',
       min: 0,
       max: 100,
       optimalMin: 45,
       optimalMax: 70,
       updatedAt: now,
-    },
-    {
+    });
+  }
+  if (typeof raw.light === 'number') {
+    list.push({
       type: 'light',
-      value: typeof raw.light === 'number' ? Math.round(raw.light) : 12000,
+      value: Math.round(raw.light),
       unit: 'lx',
       min: 0,
       max: 65535,
       optimalMin: 10000,
       optimalMax: 25000,
       updatedAt: now,
-    },
-  ];
+    });
+  }
+
+  return list;
 }
 
 // ============================================================

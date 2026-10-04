@@ -121,3 +121,28 @@ export async function getStoredDevices(): Promise<DeviceState[] | null> {
     return null;
   }
 }
+
+// Xóa dữ liệu cảm biến lưu trữ gần nhất
+export async function clearAllStoredSensors(): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(STORAGE_KEY_LAST_SENSORS);
+  } catch (err) {
+    console.warn('[Storage] Lỗi khi xóa dữ liệu cảm biến lưu trữ:', err);
+  }
+}
+
+// Dọn dẹp sạch toàn bộ dữ liệu cảm biến và thiết bị cũ trong bộ nhớ đệm
+export async function clearAllStoredData(): Promise<void> {
+  try {
+    await AsyncStorage.multiRemove([
+      STORAGE_KEY_LAST_SENSORS,
+      STORAGE_KEY_DEVICES,
+      `${STORAGE_PREFIX_HISTORY}temperature`,
+      `${STORAGE_PREFIX_HISTORY}airHumidity`,
+      `${STORAGE_PREFIX_HISTORY}soilMoisture`,
+      `${STORAGE_PREFIX_HISTORY}light`,
+    ]);
+  } catch (err) {
+    console.warn('[Storage] Lỗi khi dọn dẹp bộ nhớ đệm:', err);
+  }
+}
