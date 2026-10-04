@@ -303,6 +303,20 @@ export async function sendMqttDeviceCommand(
     message.qos = 1;
     client.send(message);
 
+    // Đồng bộ ngay retained message lên topic state để broker luôn lưu đúng trạng thái khi reload trang
+    const stateTopic = `${TOPIC_STATE_PREFIX}${type}`;
+    const statePayload = JSON.stringify({
+      type,
+      label: type === 'pump' ? 'Máy bơm nước' : 'Đèn quang hợp',
+      isOn,
+      lastToggledAt: new Date().toISOString(),
+    });
+    const stateMessage = new Paho.Message(statePayload);
+    stateMessage.destinationName = stateTopic;
+    stateMessage.qos = 1;
+    stateMessage.retained = true;
+    client.send(stateMessage);
+
     // Cập nhật optimistic local state ngay lập tức
     latestDevices[type] = {
       type,

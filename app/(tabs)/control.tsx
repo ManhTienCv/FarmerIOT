@@ -519,6 +519,7 @@ export default function ControlScreen() {
     sendMqttModeCommand(mode);
   };
 
+  const hasActiveSchedules = schedules.some((s) => s.isEnabled);
   const isOverrideActive = Boolean(overrideUntil && overrideUntil.getTime() > Date.now());
   const overrideTimeFormatted = overrideUntil
     ? overrideUntil.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
@@ -644,7 +645,9 @@ export default function ControlScreen() {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.overrideAlertTitle}>Đang bật/tắt bằng tay</Text>
                   <Text style={styles.overrideAlertDesc}>
-                    Tạm dừng lịch tưới đến <Text style={{ fontWeight: '700' }}>{overrideTimeFormatted}</Text>.
+                    {hasActiveSchedules
+                      ? `Tạm dừng các ca tưới đã hẹn đến ${overrideTimeFormatted}.`
+                      : `Ưu tiên nút bấm đến ${overrideTimeFormatted}. Bơm có rơ-le tự ngắt sau 5 phút an toàn.`}
                   </Text>
                 </View>
               </View>
@@ -662,7 +665,9 @@ export default function ControlScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={styles.rainLockTitle}>🌧️ Tránh tưới khi có mưa ({weather.rainProbability}%)</Text>
                 <Text style={styles.rainLockDesc}>
-                  Hệ thống tạm ngưng tưới tự động để bảo vệ bầu dưa, chống úng rễ.
+                  {hasActiveSchedules
+                    ? 'Hệ thống tạm ngưng các ca tưới tự động để bảo vệ bầu dưa, chống úng rễ.'
+                    : 'Bầu dưa được cấp ẩm tự nhiên ngoài trời, chưa cần đặt lịch tưới.'}
                 </Text>
               </View>
             </View>
