@@ -279,7 +279,11 @@ export function disconnectMqtt(): void {
 // ============================================================
 // GỬI LỆNH ĐIỀU KHIỂN (PUBLISH COMMAND)
 // ============================================================
-export async function sendMqttDeviceCommand(type: DeviceType, isOn: boolean): Promise<boolean> {
+export async function sendMqttDeviceCommand(
+  type: DeviceType,
+  isOn: boolean,
+  durationSeconds?: number
+): Promise<boolean> {
   if (!client || !isConnected) {
     return false;
   }
@@ -289,6 +293,7 @@ export async function sendMqttDeviceCommand(type: DeviceType, isOn: boolean): Pr
     const payload = JSON.stringify({
       isOn,
       type,
+      durationSeconds: durationSeconds || 0,
       sender: 'app',
       timestamp: new Date().toISOString(),
     });
@@ -342,6 +347,22 @@ export async function sendMqttRainLock(rainLock: boolean): Promise<boolean> {
     return true;
   } catch (err) {
     console.error('[MQTT] Lỗi gửi khóa mưa:', err);
+    return false;
+  }
+}
+
+export async function sendMqttSchedules(schedules: any[]): Promise<boolean> {
+  if (!client || !isConnected) return false;
+  try {
+    const topic = `${TOPIC_CONTROL_PREFIX}schedules`;
+    const payload = JSON.stringify({ schedules, sender: 'app' });
+    const message = new Paho.Message(payload);
+    message.destinationName = topic;
+    message.qos = 1;
+    client.send(message);
+    return true;
+  } catch (err) {
+    console.error('[MQTT] Lỗi đồng bộ danh sách lịch tưới:', err);
     return false;
   }
 }

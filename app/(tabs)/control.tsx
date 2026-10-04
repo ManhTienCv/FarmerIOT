@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -31,6 +31,9 @@ import {
   Trash2,
   Check,
   X,
+  Timer,
+  Sparkles,
+  Info,
 } from 'lucide-react-native';
 import type { DeviceState, DeviceType } from '@/types';
 import { colors, radius, shadows, spacing, typography } from '@/constants/theme';
@@ -43,9 +46,11 @@ import {
   connectMqtt,
   subscribeDevices,
   subscribeConnection,
+  subscribeSensors,
   sendMqttDeviceCommand,
   sendMqttModeCommand,
   sendMqttRainLock,
+  sendMqttSchedules,
 } from '@/services/mqttService';
 
 export interface IrrigationSchedule {
@@ -55,7 +60,156 @@ export interface IrrigationSchedule {
   days: number[]; // 0 = CN, 1 = T2, ..., 6 = T7
   isEnabled: boolean;
   label: string;
+  note?: string;
+  stagePreset?: 'seedling' | 'vegetative' | 'fruiting' | 'ripening' | 'custom';
 }
+
+export interface MelonPreset {
+  id: 'seedling' | 'vegetative' | 'fruiting' | 'ripening';
+  stageName: string;
+  daysSpan: string;
+  badge: string;
+  description: string;
+  schedules: Omit<IrrigationSchedule, 'id'>[];
+}
+
+export const MELON_SCHEDULE_PRESETS: MelonPreset[] = [
+  {
+    id: 'seedling',
+    stageName: 'GĐ 1: Cây con',
+    daysSpan: 'Ngày 1 - 15',
+    badge: '2 ca · 4 phút/ngày',
+    description: 'Tưới sáng 07:00 (2p) & chiều 16:00 (2p) giữ ẩm nhẹ cho bầu ươm',
+    schedules: [
+      {
+        time: '07:00',
+        durationMinutes: 2,
+        days: [1, 2, 3, 4, 5, 6, 0],
+        isEnabled: true,
+        label: 'Tưới sáng cây con',
+        note: 'Độ ẩm rễ mục tiêu 60-65%',
+        stagePreset: 'seedling',
+      },
+      {
+        time: '16:00',
+        durationMinutes: 2,
+        days: [1, 2, 3, 4, 5, 6, 0],
+        isEnabled: true,
+        label: 'Tưới chiều mát',
+        note: 'Cấp ẩm nhẹ trước khi tắt nắng',
+        stagePreset: 'seedling',
+      },
+    ],
+  },
+  {
+    id: 'vegetative',
+    stageName: 'GĐ 2: Thân lá & Leo giàn',
+    daysSpan: 'Ngày 16 - 35',
+    badge: '3 ca · 8 phút/ngày',
+    description: 'Tưới 07:00 (3p), dặm trưa 11:30 (2p) & chiều 16:30 (3p) cấp nước sinh khối',
+    schedules: [
+      {
+        time: '07:00',
+        durationMinutes: 3,
+        days: [1, 2, 3, 4, 5, 6, 0],
+        isEnabled: true,
+        label: 'Tưới sáng thân lá',
+        note: 'Nhu cầu nước sinh khối',
+        stagePreset: 'vegetative',
+      },
+      {
+        time: '11:30',
+        durationMinutes: 2,
+        days: [1, 2, 3, 4, 5, 6, 0],
+        isEnabled: true,
+        label: 'Tưới dặm trưa nắng',
+        note: 'Hạ nhiệt bầu rễ và giữ ẩm trưa',
+        stagePreset: 'vegetative',
+      },
+      {
+        time: '16:30',
+        durationMinutes: 3,
+        days: [1, 2, 3, 4, 5, 6, 0],
+        isEnabled: true,
+        label: 'Tưới chiều mát',
+        note: 'Chuẩn bị dinh dưỡng đêm',
+        stagePreset: 'vegetative',
+      },
+    ],
+  },
+  {
+    id: 'fruiting',
+    stageName: 'GĐ 3: Nuôi trái & Phình quả',
+    daysSpan: 'Ngày 36 - 55',
+    badge: '4 ca · 12 phút/ngày',
+    description: 'Chia nhỏ 4 ca (07h, 10h, 13h30, 16h30) chống sốc nước nứt vỏ trái',
+    schedules: [
+      {
+        time: '07:00',
+        durationMinutes: 3,
+        days: [1, 2, 3, 4, 5, 6, 0],
+        isEnabled: true,
+        label: 'Tưới sáng nuôi trái',
+        note: 'Nhu cầu nước cao nhất',
+        stagePreset: 'fruiting',
+      },
+      {
+        time: '10:00',
+        durationMinutes: 3,
+        days: [1, 2, 3, 4, 5, 6, 0],
+        isEnabled: true,
+        label: 'Tưới tăng trưởng sáng',
+        note: 'Cấp nước trước đỉnh nắng trưa',
+        stagePreset: 'fruiting',
+      },
+      {
+        time: '13:30',
+        durationMinutes: 3,
+        days: [1, 2, 3, 4, 5, 6, 0],
+        isEnabled: true,
+        label: 'Tưới dặm đầu chiều',
+        note: 'Hạ nhiệt bầu xơ dừa',
+        stagePreset: 'fruiting',
+      },
+      {
+        time: '16:30',
+        durationMinutes: 3,
+        days: [1, 2, 3, 4, 5, 6, 0],
+        isEnabled: true,
+        label: 'Tưới chiều mát',
+        note: 'Tích lũy khoáng nuôi quả',
+        stagePreset: 'fruiting',
+      },
+    ],
+  },
+  {
+    id: 'ripening',
+    stageName: 'GĐ 4: Lên lưới & Tích đường',
+    daysSpan: 'Ngày 56 - 75',
+    badge: '2 ca · 3 phút/ngày',
+    description: 'Xiết nước 07:00 (2p) & 15:30 (1p) tạo vân lưới nổi đẹp, ngọt Brix cao',
+    schedules: [
+      {
+        time: '07:00',
+        durationMinutes: 2,
+        days: [1, 2, 3, 4, 5, 6, 0],
+        isEnabled: true,
+        label: 'Tưới sáng xiết nước',
+        note: 'Giảm nước để tăng độ Brix',
+        stagePreset: 'ripening',
+      },
+      {
+        time: '15:30',
+        durationMinutes: 1,
+        days: [1, 2, 3, 4, 5, 6, 0],
+        isEnabled: true,
+        label: 'Tưới nhấp chiều',
+        note: 'Giữ ẩm tối thiểu chống héo rụng',
+        stagePreset: 'ripening',
+      },
+    ],
+  },
+];
 
 const STORAGE_KEY_SCHEDULES = '@aiot_irrigation_schedules';
 const DAY_LABELS = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
@@ -78,14 +232,17 @@ export default function ControlScreen() {
   const [overrideUntil, setOverrideUntil] = useState<Date | null>(null);
   const [weather, setWeather] = useState<OutdoorWeather | null>(null);
 
-  // Quản lý Lịch tưới
+  // Quản lý Lịch tưới & Đồng bộ cảm biến
   const [schedules, setSchedules] = useState<IrrigationSchedule[]>(DEFAULT_SCHEDULES);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+  const [isPresetModalOpen, setIsPresetModalOpen] = useState(false);
+  const [currentSoilMoisture, setCurrentSoilMoisture] = useState<number>(0);
   const [formLabel, setFormLabel] = useState('Tưới nhỏ giọt');
   const [formHour, setFormHour] = useState('07');
   const [formMinute, setFormMinute] = useState('00');
   const [formDuration, setFormDuration] = useState(3);
   const [formDays, setFormDays] = useState<number[]>([1, 2, 3, 4, 5, 6, 0]);
+  const [formNote, setFormNote] = useState('');
   const lastTriggeredRef = useRef<string>('');
 
   // Đọc lịch tưới đã lưu từ AsyncStorage
@@ -109,12 +266,57 @@ export default function ControlScreen() {
     setSchedules(newSchedules);
     try {
       await AsyncStorage.setItem(STORAGE_KEY_SCHEDULES, JSON.stringify(newSchedules));
+      sendMqttSchedules(newSchedules);
     } catch (e) {
       console.error('Lỗi lưu lịch tưới:', e);
     }
   };
 
-  // Vòng lặp kiểm tra lịch tưới mỗi 20s (chỉ chạy khi ở chế độ TỰ ĐỘNG)
+  // Tính toán ca tưới kế tiếp trong ngày và đếm ngược thời gian
+  const nextScheduleInfo = useMemo(() => {
+    if (!schedules.length) return null;
+    const now = new Date();
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    const currentDay = now.getDay();
+
+    const enabledSchedules = schedules.filter((s) => s.isEnabled && s.days.includes(currentDay));
+
+    const sortFn = (a: IrrigationSchedule, b: IrrigationSchedule) => {
+      const [ah, am] = a.time.split(':').map(Number);
+      const [bh, bm] = b.time.split(':').map(Number);
+      return ah * 60 + am - (bh * 60 + bm);
+    };
+
+    if (enabledSchedules.length > 0) {
+      const sortedToday = [...enabledSchedules].sort(sortFn);
+      const nextToday = sortedToday.find((s) => {
+        const [h, m] = s.time.split(':').map(Number);
+        return h * 60 + m > currentMinutes;
+      });
+
+      if (nextToday) {
+        const [nh, nm] = nextToday.time.split(':').map(Number);
+        const diff = nh * 60 + nm - currentMinutes;
+        return {
+          schedule: nextToday,
+          isToday: true,
+          diffMinutes: diff,
+        };
+      }
+    }
+
+    // Nếu không còn ca nào hôm nay, lấy ca sớm nhất tiếp theo
+    const allEnabled = schedules.filter((s) => s.isEnabled);
+    if (!allEnabled.length) return null;
+    const sortedAll = [...allEnabled].sort(sortFn);
+    return {
+      schedule: sortedAll[0],
+      isToday: false,
+      diffMinutes: null,
+    };
+  }, [schedules]);
+
+  // Vòng lặp kiểm tra lịch tưới mỗi 15s (chỉ chạy khi ở chế độ TỰ ĐỘNG)
   useEffect(() => {
     const checkSchedule = async () => {
       // Khi ở chế độ THỦ CÔNG, ngắt mọi can thiệp tự động (kể cả lịch hẹn giờ)
@@ -135,22 +337,34 @@ export default function ControlScreen() {
 
       if (matched) {
         lastTriggeredRef.current = triggerKey;
+
+        // KIỂM TRA KHÓA AN TOÀN TRƯỚC KHI TƯỚI:
+        // 1. Khóa do dự báo thời tiết có mưa >= 60%
+        if (weather && weather.rainProbability >= 60) {
+          console.log(`[LỊCH TƯỚI] Tự động hoãn ca "${matched.label}" do dự báo mưa (${weather.rainProbability}%)`);
+          return;
+        }
+
+        // 2. Khóa do độ ẩm đất đã đủ ẩm (>= 65%)
+        if (currentSoilMoisture >= 65) {
+          console.log(`[LỊCH TƯỚI] Tự động hoãn ca "${matched.label}" do đất đã đủ ẩm (${currentSoilMoisture}%)`);
+          return;
+        }
+
         try {
-          await toggleDevice('pump', true);
-          await sendMqttDeviceCommand('pump', true);
-          setTimeout(async () => {
-            await toggleDevice('pump', false);
-            await sendMqttDeviceCommand('pump', false);
-          }, matched.durationMinutes * 60 * 1000);
+          // GỬI DUY NHẤT 1 LỆNH MQTT KÈM THỜI LƯỢNG CHO ESP32 TỰ ĐỘNG NGẮT TẠI CHỖ
+          const durationSec = matched.durationMinutes * 60;
+          await sendMqttDeviceCommand('pump', true, durationSec);
+          console.log(`[LỊCH TƯỚI] Đã kích hoạt ca tưới "${matched.label}" (${matched.durationMinutes} phút) qua MQTT`);
         } catch (err) {
           console.error('[LỊCH TƯỚI] Lỗi kích hoạt bơm:', err);
         }
       }
     };
 
-    const interval = setInterval(checkSchedule, 20000);
+    const interval = setInterval(checkSchedule, 15000);
     return () => clearInterval(interval);
-  }, [schedules, operatingMode]);
+  }, [schedules, operatingMode, weather, currentSoilMoisture]);
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -192,19 +406,29 @@ export default function ControlScreen() {
     const unsubConn = subscribeConnection((connected) => {
       setIsMqttOnline(connected);
     });
+    const unsubSensors = subscribeSensors((readings) => {
+      const soil = readings.find((s) => s.type === 'soilMoisture');
+      if (soil && typeof soil.value === 'number') {
+        setCurrentSoilMoisture(soil.value);
+      }
+    });
     return () => {
       unsubDevices();
       unsubConn();
+      unsubSensors();
     };
   }, []);
 
-  // Đồng bộ khóa trời mưa từ dự báo thời tiết OpenWeather xuống phần cứng ESP32 qua MQTT
+  // Đồng bộ khóa trời mưa và danh sách lịch tưới xuống ESP32 khi kết nối MQTT
   useEffect(() => {
     if (isMqttOnline && weather) {
       const isRainLikely = weather.rainProbability >= 60;
       sendMqttRainLock(isRainLikely);
     }
-  }, [isMqttOnline, weather]);
+    if (isMqttOnline && schedules.length > 0) {
+      sendMqttSchedules(schedules);
+    }
+  }, [isMqttOnline, weather, schedules.length]);
 
   const handleToggle = useCallback(async (type: DeviceType, isOn: boolean) => {
     // Thuật toán Smart Override giải quyết xung đột Tự động vs Nút bấm tay
@@ -215,12 +439,18 @@ export default function ControlScreen() {
 
     setToggling(type);
     try {
-      const updated = await toggleDevice(type, isOn);
-      setDevices((prev) => prev.map((d) => (d.type === type ? updated : d)));
+      // Chuẩn hóa 1 kênh duy nhất qua MQTT (kèm thời lượng tối đa 5 phút an toàn cho bơm)
+      const durationSec = (type === 'pump' && isOn) ? 300 : 0;
+      const sent = await sendMqttDeviceCommand(type, isOn, durationSec);
+      if (!sent) {
+        // Fallback REST khi chưa kết nối MQTT
+        const updated = await toggleDevice(type, isOn);
+        setDevices((prev) => prev.map((d) => (d.type === type ? updated : d)));
+      }
     } catch (e: any) {
       Alert.alert(
         'Lỗi điều khiển thiết bị',
-        e.message || 'Không thể gửi lệnh đến ESP32. Vui lòng kiểm tra Wi-Fi và IP phần cứng.',
+        e.message || 'Không thể gửi lệnh đến thiết bị.',
       );
     } finally {
       setToggling(null);
@@ -237,6 +467,20 @@ export default function ControlScreen() {
     saveSchedules(updated);
   };
 
+  const handleApplyPreset = (preset: MelonPreset, replaceAll: boolean = true) => {
+    const newItems: IrrigationSchedule[] = preset.schedules.map((s, idx) => ({
+      ...s,
+      id: `sched-${preset.id}-${Date.now()}-${idx}`,
+    }));
+    const updated = replaceAll ? newItems : [...schedules, ...newItems];
+    saveSchedules(updated);
+    setIsPresetModalOpen(false);
+    Alert.alert(
+      'Đã nạp mẫu Dưa Lưới',
+      `Đã áp dụng mẫu "${preset.stageName}" gồm ${newItems.length} ca tưới chuẩn kỹ thuật.`
+    );
+  };
+
   const handleSaveScheduleForm = () => {
     const newSchedule: IrrigationSchedule = {
       id: `sched-${Date.now()}`,
@@ -245,6 +489,7 @@ export default function ControlScreen() {
       days: formDays.length > 0 ? formDays : [1, 2, 3, 4, 5, 6, 0],
       isEnabled: true,
       label: formLabel.trim() || 'Tưới nước',
+      note: formNote.trim(),
     };
     saveSchedules([...schedules, newSchedule]);
     setIsScheduleModalOpen(false);
@@ -452,25 +697,99 @@ export default function ControlScreen() {
         </View>
 
         {/* Lịch tưới tự động */}
+        {/* Lịch tưới tự động */}
         <View style={styles.scheduleHeaderRow}>
           <View style={{ flex: 1 }}>
             <SectionHeader title="Lịch tưới tự động" subtitle="Hẹn giờ bơm nước theo tuần / tháng" />
           </View>
-          <Pressable
-            style={styles.addScheduleBtn}
-            onPress={() => setIsScheduleModalOpen(true)}
-            hitSlop={8}
-          >
-            <Plus size={15} color="#FFFFFF" strokeWidth={2.5} />
-            <Text style={styles.addScheduleBtnText}>Đặt Lịch</Text>
-          </Pressable>
+          <View style={styles.scheduleActionBtns}>
+            <Pressable
+              style={styles.melonPresetBtn}
+              onPress={() => setIsPresetModalOpen(true)}
+              hitSlop={8}
+            >
+              <Sparkles size={13} color={colors.primary[700]} strokeWidth={2.4} />
+              <Text style={styles.melonPresetBtnText}>Mẫu Dưa Lưới</Text>
+            </Pressable>
+            <Pressable
+              style={styles.addScheduleBtn}
+              onPress={() => setIsScheduleModalOpen(true)}
+              hitSlop={8}
+            >
+              <Plus size={14} color="#FFFFFF" strokeWidth={2.5} />
+              <Text style={styles.addScheduleBtnText}>Đặt Lịch</Text>
+            </Pressable>
+          </View>
         </View>
+
+        {/* Banner Ca tưới kế tiếp & Điều kiện an toàn */}
+        {nextScheduleInfo && (
+          <View style={styles.nextScheduleCard}>
+            <View style={styles.nextScheduleTop}>
+              <View style={styles.nextScheduleLabelRow}>
+                <Timer size={16} color={colors.primary[600]} strokeWidth={2.4} />
+                <Text style={styles.nextScheduleTitle}>Ca tưới kế tiếp</Text>
+              </View>
+              <View
+                style={[
+                  styles.nextScheduleBadge,
+                  operatingMode !== 'auto'
+                    ? styles.nextScheduleBadgePaused
+                    : weather && weather.rainProbability >= 60
+                    ? styles.nextScheduleBadgeRain
+                    : currentSoilMoisture >= 65
+                    ? styles.nextScheduleBadgeSoil
+                    : styles.nextScheduleBadgeReady,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.nextScheduleBadgeText,
+                    operatingMode !== 'auto'
+                      ? styles.nextScheduleBadgeTextPaused
+                      : weather && weather.rainProbability >= 60
+                      ? styles.nextScheduleBadgeTextRain
+                      : currentSoilMoisture >= 65
+                      ? styles.nextScheduleBadgeTextSoil
+                      : styles.nextScheduleBadgeTextReady,
+                  ]}
+                >
+                  {operatingMode !== 'auto'
+                    ? 'Tạm dừng (Thủ công)'
+                    : weather && weather.rainProbability >= 60
+                    ? `Hoãn do mưa (${weather.rainProbability}%)`
+                    : currentSoilMoisture >= 65
+                    ? `Hoãn do đất ẩm (${currentSoilMoisture}%)`
+                    : 'Sẵn sàng tự động'}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.nextScheduleBottom}>
+              <View style={styles.nextScheduleTimePill}>
+                <Text style={styles.nextScheduleTimeText}>{nextScheduleInfo.schedule.time}</Text>
+              </View>
+              <View style={styles.nextScheduleDetails}>
+                <Text style={styles.nextScheduleName} numberOfLines={1}>
+                  {nextScheduleInfo.schedule.label} ({nextScheduleInfo.schedule.durationMinutes} phút)
+                </Text>
+                <Text style={styles.nextScheduleCountdown}>
+                  {nextScheduleInfo.isToday && nextScheduleInfo.diffMinutes !== null
+                    ? nextScheduleInfo.diffMinutes > 60
+                      ? `Còn khoảng ${Math.floor(nextScheduleInfo.diffMinutes / 60)} giờ ${nextScheduleInfo.diffMinutes % 60} phút nữa`
+                      : `Còn ${nextScheduleInfo.diffMinutes} phút nữa sẽ kích hoạt`
+                    : 'Ca tưới sớm nhất của ngày mai'}
+                </Text>
+              </View>
+            </View>
+          </View>
+        )}
 
         <View style={styles.scheduleListWrap}>
           {schedules.length === 0 ? (
             <View style={styles.scheduleEmptyBox}>
               <Clock size={28} color={colors.textMuted} />
-              <Text style={styles.scheduleEmptyText}>Chưa có lịch tưới. Nhấn "+ Đặt Lịch" để thêm mới.</Text>
+              <Text style={styles.scheduleEmptyText}>Chưa có lịch tưới. Nhấn "Mẫu Dưa Lưới" hoặc "+ Đặt Lịch".</Text>
             </View>
           ) : (
             schedules.map((item) => (
@@ -482,10 +801,28 @@ export default function ControlScreen() {
                     </Text>
                   </View>
                   <View style={styles.scheduleInfo}>
-                    <Text style={styles.scheduleLabel} numberOfLines={1}>{item.label}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={styles.scheduleLabel} numberOfLines={1}>{item.label}</Text>
+                      {item.stagePreset && (
+                        <View style={styles.stageTag}>
+                          <Text style={styles.stageTagText}>
+                            {item.stagePreset === 'seedling' ? 'Cây con'
+                              : item.stagePreset === 'vegetative' ? 'Thân lá'
+                              : item.stagePreset === 'fruiting' ? 'Nuôi trái'
+                              : item.stagePreset === 'ripening' ? 'Lên lưới'
+                              : 'Chuẩn'}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
                     <Text style={styles.scheduleSub} numberOfLines={1}>
                       Tưới {item.durationMinutes} phút · {item.days.length === 7 ? 'Mỗi ngày' : item.days.map((d) => DAY_LABELS[d]).join(', ')}
                     </Text>
+                    {item.note ? (
+                      <Text style={styles.scheduleNoteText} numberOfLines={1}>
+                        💡 {item.note}
+                      </Text>
+                    ) : null}
                   </View>
                 </View>
 
@@ -553,7 +890,7 @@ export default function ControlScreen() {
         <View style={{ height: spacing.xl }} />
       </ScrollView>
 
-      {/* Modal Đặt Lịch Tưới */}
+      {/* Modal Đặt Lịch Tưới Tùy Chỉnh */}
       <Modal
         visible={isScheduleModalOpen}
         transparent
@@ -579,8 +916,8 @@ export default function ControlScreen() {
               </Pressable>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 420 }}>
-              {/* Tên lịch */}
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 460 }}>
+              {/* Tên ca tưới */}
               <Text style={styles.fieldLabel}>Tên ca tưới</Text>
               <TextInput
                 style={styles.textInput}
@@ -589,6 +926,20 @@ export default function ControlScreen() {
                 placeholder="VD: Tưới sáng nhỏ giọt"
                 placeholderTextColor={colors.textMuted}
               />
+              {/* Gợi ý tên nhanh */}
+              <View style={[styles.chipRow, { marginTop: 6 }]}>
+                {['Tưới sáng', 'Tưới dặm trưa', 'Tưới chiều mát', 'Tưới dinh dưỡng', 'Tưới nhỏ giọt'].map((name) => (
+                  <Pressable
+                    key={name}
+                    onPress={() => setFormLabel(name)}
+                    style={[styles.quickNameChip, formLabel === name && styles.quickNameChipActive]}
+                  >
+                    <Text style={[styles.quickNameChipText, formLabel === name && styles.quickNameChipTextActive]}>
+                      {name}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
 
               {/* Giờ tưới */}
               <Text style={styles.fieldLabel}>Thời gian bắt đầu</Text>
@@ -596,7 +947,7 @@ export default function ControlScreen() {
                 <View style={styles.timeCol}>
                   <Text style={styles.timeSubLabel}>Giờ</Text>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
-                    {['05', '06', '07', '08', '09', '10', '11', '14', '15', '16', '17', '18'].map((h) => (
+                    {['05', '06', '07', '08', '09', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20'].map((h) => (
                       <Pressable
                         key={h}
                         onPress={() => setFormHour(h)}
@@ -609,11 +960,11 @@ export default function ControlScreen() {
                 </View>
               </View>
 
-              <View style={[styles.timeSelectRow, { marginTop: spacing.xs }]}>
+              <View style={[styles.timeSelectRow, { marginTop: spacing.xs + 2 }]}>
                 <View style={styles.timeCol}>
                   <Text style={styles.timeSubLabel}>Phút</Text>
                   <View style={styles.chipRow}>
-                    {['00', '15', '30', '45'].map((m) => (
+                    {['00', '10', '15', '20', '30', '45'].map((m) => (
                       <Pressable
                         key={m}
                         onPress={() => setFormMinute(m)}
@@ -629,7 +980,7 @@ export default function ControlScreen() {
               {/* Thời lượng tưới */}
               <Text style={styles.fieldLabel}>Thời lượng bơm (Phút)</Text>
               <View style={styles.chipRow}>
-                {[1, 2, 3, 5, 10, 15].map((dur) => (
+                {[1, 2, 3, 5, 8, 10, 15].map((dur) => (
                   <Pressable
                     key={dur}
                     onPress={() => setFormDuration(dur)}
@@ -643,8 +994,31 @@ export default function ControlScreen() {
               </View>
 
               {/* Ngày lặp lại */}
-              <Text style={styles.fieldLabel}>Lặp lại trong tuần</Text>
-              <View style={styles.chipRow}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: spacing.sm }}>
+                <Text style={[styles.fieldLabel, { marginTop: 0 }]}>Lặp lại trong tuần</Text>
+                <View style={{ flexDirection: 'row', gap: 4 }}>
+                  <Pressable
+                    onPress={() => setFormDays([1, 2, 3, 4, 5, 6, 0])}
+                    style={styles.repeatQuickBtn}
+                  >
+                    <Text style={styles.repeatQuickText}>Cả tuần</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => setFormDays([1, 2, 3, 4, 5])}
+                    style={styles.repeatQuickBtn}
+                  >
+                    <Text style={styles.repeatQuickText}>T2 - T6</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => setFormDays([6, 0])}
+                    style={styles.repeatQuickBtn}
+                  >
+                    <Text style={styles.repeatQuickText}>Cuối tuần</Text>
+                  </Pressable>
+                </View>
+              </View>
+
+              <View style={[styles.chipRow, { marginTop: 6 }]}>
                 {DAY_LABELS.map((dayLabel, idx) => {
                   const isSelected = formDays.includes(idx);
                   return (
@@ -666,6 +1040,24 @@ export default function ControlScreen() {
                   );
                 })}
               </View>
+
+              {/* Ghi chú */}
+              <Text style={styles.fieldLabel}>Ghi chú (Tùy chọn)</Text>
+              <TextInput
+                style={styles.textInput}
+                value={formNote}
+                onChangeText={setFormNote}
+                placeholder="VD: Giai đoạn nuôi trái - giữ ẩm đều"
+                placeholderTextColor={colors.textMuted}
+              />
+
+              {/* Lưu ý an toàn */}
+              <View style={styles.scheduleSafetyNote}>
+                <Info size={14} color={colors.primary[600]} />
+                <Text style={styles.scheduleSafetyNoteText}>
+                  ESP32 sẽ tự ngắt bơm chính xác tại chỗ khi hết thời gian. Ca tưới sẽ tự hoãn khi có mưa hoặc đất &ge; 65%.
+                </Text>
+              </View>
             </ScrollView>
 
             {/* Buttons */}
@@ -682,6 +1074,88 @@ export default function ControlScreen() {
               >
                 <Check size={16} color="#FFFFFF" strokeWidth={2.5} />
                 <Text style={styles.modalSaveText}>Lưu Lịch</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Modal Mẫu Lịch Dưa Lưới Chuẩn Chuyên Gia */}
+      <Modal
+        visible={isPresetModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsPresetModalOpen(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setIsPresetModalOpen(false)}
+        >
+          <Pressable style={[styles.modalContent, { maxHeight: '88%' }]} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs + 2 }}>
+                <Sparkles size={20} color={colors.primary[600]} />
+                <Text style={styles.modalTitle}>Mẫu Lịch Dưa Lưới Chuẩn</Text>
+              </View>
+              <Pressable
+                onPress={() => setIsPresetModalOpen(false)}
+                style={styles.modalCloseBtn}
+                hitSlop={8}
+              >
+                <X size={20} color={colors.textMuted} />
+              </Pressable>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 460 }}>
+              <Text style={styles.presetIntroText}>
+                Chọn giai đoạn sinh trưởng của vườn dưa để tự động nạp gói ca tưới chuẩn chuyên gia nông nghiệp:
+              </Text>
+
+              {MELON_SCHEDULE_PRESETS.map((preset) => (
+                <View key={preset.id} style={styles.presetCard}>
+                  <View style={styles.presetCardHeader}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.presetStageName}>{preset.stageName}</Text>
+                      <Text style={styles.presetDaysSpan}>{preset.daysSpan}</Text>
+                    </View>
+                    <View style={styles.presetBadge}>
+                      <Text style={styles.presetBadgeText}>{preset.badge}</Text>
+                    </View>
+                  </View>
+
+                  <Text style={styles.presetDesc}>{preset.description}</Text>
+
+                  {/* Chi tiết ca tưới */}
+                  <View style={styles.presetTimeList}>
+                    {preset.schedules.map((sc, sidx) => (
+                      <View key={sidx} style={styles.presetTimeItem}>
+                        <Clock size={12} color={colors.primary[700]} />
+                        <Text style={styles.presetTimeItemText}>
+                          {sc.time} ({sc.durationMinutes}p) - {sc.label}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+
+                  <View style={styles.presetActionRow}>
+                    <Pressable
+                      style={styles.applyPresetBtn}
+                      onPress={() => handleApplyPreset(preset, true)}
+                    >
+                      <Check size={14} color="#FFFFFF" strokeWidth={2.5} />
+                      <Text style={styles.applyPresetBtnText}>Áp dụng mẫu này</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
+
+            <View style={[styles.modalActions, { marginTop: spacing.sm }]}>
+              <Pressable
+                onPress={() => setIsPresetModalOpen(false)}
+                style={styles.modalCancelBtn}
+              >
+                <Text style={styles.modalCancelText}>Đóng</Text>
               </Pressable>
             </View>
           </Pressable>
@@ -1257,6 +1731,281 @@ const styles = StyleSheet.create({
   },
   modalSaveText: {
     fontSize: 13,
+    fontFamily: 'Inter-Bold',
+    color: '#FFFFFF',
+  },
+  scheduleActionBtns: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs + 2,
+  },
+  melonPresetBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(45, 106, 79, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(45, 106, 79, 0.25)',
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: spacing.xs + 2,
+    borderRadius: radius.pill,
+    gap: 4,
+  },
+  melonPresetBtnText: {
+    fontSize: 12,
+    fontFamily: 'Inter-SemiBold',
+    color: colors.primary[700],
+  },
+  nextScheduleCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: spacing.md,
+    ...shadows.soft,
+  },
+  nextScheduleTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.xs + 3,
+  },
+  nextScheduleLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  nextScheduleTitle: {
+    fontSize: 12,
+    fontFamily: 'Inter-Bold',
+    color: colors.text,
+  },
+  nextScheduleBadge: {
+    paddingHorizontal: spacing.xs + 4,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+  },
+  nextScheduleBadgeReady: {
+    backgroundColor: 'rgba(16, 185, 129, 0.10)',
+    borderColor: 'rgba(16, 185, 129, 0.25)',
+  },
+  nextScheduleBadgeRain: {
+    backgroundColor: 'rgba(59, 130, 246, 0.10)',
+    borderColor: 'rgba(59, 130, 246, 0.25)',
+  },
+  nextScheduleBadgeSoil: {
+    backgroundColor: 'rgba(245, 158, 11, 0.10)',
+    borderColor: 'rgba(245, 158, 11, 0.25)',
+  },
+  nextScheduleBadgePaused: {
+    backgroundColor: 'rgba(107, 114, 128, 0.10)',
+    borderColor: 'rgba(107, 114, 128, 0.25)',
+  },
+  nextScheduleBadgeText: {
+    fontSize: 10,
+    fontFamily: 'Inter-Bold',
+  },
+  nextScheduleBadgeTextReady: {
+    color: colors.primary[700],
+  },
+  nextScheduleBadgeTextRain: {
+    color: colors.water[600],
+  },
+  nextScheduleBadgeTextSoil: {
+    color: '#B45309',
+  },
+  nextScheduleBadgeTextPaused: {
+    color: colors.textMuted,
+  },
+  nextScheduleBottom: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  nextScheduleTimePill: {
+    backgroundColor: colors.surfaceAlt,
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: 4,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  nextScheduleTimeText: {
+    fontSize: 15,
+    fontFamily: 'Inter-Bold',
+    color: colors.primary[700],
+  },
+  nextScheduleDetails: {
+    flex: 1,
+    gap: 2,
+  },
+  nextScheduleName: {
+    fontSize: 12,
+    fontFamily: 'Inter-SemiBold',
+    color: colors.text,
+  },
+  nextScheduleCountdown: {
+    fontSize: 11,
+    fontFamily: 'Inter-Regular',
+    color: colors.textMuted,
+  },
+  stageTag: {
+    backgroundColor: 'rgba(45, 106, 79, 0.08)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: 'rgba(45, 106, 79, 0.18)',
+  },
+  stageTagText: {
+    fontSize: 10,
+    fontFamily: 'Inter-Bold',
+    color: colors.primary[700],
+  },
+  scheduleNoteText: {
+    fontSize: 11,
+    fontFamily: 'Inter-Regular',
+    color: colors.textMuted,
+    fontStyle: 'italic',
+  },
+  quickNameChip: {
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: radius.sm,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  quickNameChipActive: {
+    backgroundColor: 'rgba(45, 106, 79, 0.12)',
+    borderColor: colors.primary[500],
+  },
+  quickNameChipText: {
+    fontSize: 11,
+    fontFamily: 'Inter-Medium',
+    color: colors.textMuted,
+  },
+  quickNameChipTextActive: {
+    color: colors.primary[700],
+    fontFamily: 'Inter-Bold',
+  },
+  repeatQuickBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radius.sm,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  repeatQuickText: {
+    fontSize: 10,
+    fontFamily: 'Inter-SemiBold',
+    color: colors.primary[700],
+  },
+  scheduleSafetyNote: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    backgroundColor: 'rgba(45, 106, 79, 0.06)',
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    marginTop: spacing.md,
+    borderWidth: 1,
+    borderColor: 'rgba(45, 106, 79, 0.15)',
+  },
+  scheduleSafetyNoteText: {
+    fontSize: 11,
+    fontFamily: 'Inter-Regular',
+    color: colors.textMuted,
+    flex: 1,
+    lineHeight: 15,
+  },
+  presetIntroText: {
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+    color: colors.textMuted,
+    marginBottom: spacing.md,
+    lineHeight: 17,
+  },
+  presetCard: {
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: spacing.md,
+  },
+  presetCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 4,
+  },
+  presetStageName: {
+    fontSize: 14,
+    fontFamily: 'Inter-Bold',
+    color: colors.text,
+  },
+  presetDaysSpan: {
+    fontSize: 11,
+    fontFamily: 'Inter-Medium',
+    color: colors.textMuted,
+  },
+  presetBadge: {
+    backgroundColor: 'rgba(45, 106, 79, 0.10)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: 'rgba(45, 106, 79, 0.20)',
+  },
+  presetBadgeText: {
+    fontSize: 11,
+    fontFamily: 'Inter-Bold',
+    color: colors.primary[700],
+  },
+  presetDesc: {
+    fontSize: 11,
+    fontFamily: 'Inter-Regular',
+    color: colors.textMuted,
+    lineHeight: 16,
+    marginBottom: spacing.sm,
+  },
+  presetTimeList: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    padding: spacing.xs + 4,
+    gap: 4,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  presetTimeItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  presetTimeItemText: {
+    fontSize: 11,
+    fontFamily: 'Inter-Medium',
+    color: colors.text,
+  },
+  presetActionRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  applyPresetBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primary[500],
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2,
+    borderRadius: radius.md,
+    gap: 6,
+  },
+  applyPresetBtnText: {
+    fontSize: 12,
     fontFamily: 'Inter-Bold',
     color: '#FFFFFF',
   },
