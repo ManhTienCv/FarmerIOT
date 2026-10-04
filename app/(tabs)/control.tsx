@@ -319,8 +319,9 @@ export default function ControlScreen() {
   // Vòng lặp kiểm tra lịch tưới mỗi 15s (chỉ chạy khi ở chế độ TỰ ĐỘNG)
   useEffect(() => {
     const checkSchedule = async () => {
-      // Khi ở chế độ THỦ CÔNG, ngắt mọi can thiệp tự động (kể cả lịch hẹn giờ)
+      // Khi ở chế độ THỦ CÔNG hoặc chưa có lịch nào, ngắt mọi can thiệp tự động
       if (operatingMode !== 'auto') return;
+      if (!schedules || schedules.length === 0) return;
 
       const now = new Date();
       const hh = String(now.getHours()).padStart(2, '0');
@@ -465,6 +466,21 @@ export default function ControlScreen() {
   const handleDeleteSchedule = (id: string) => {
     const updated = schedules.filter((s) => s.id !== id);
     saveSchedules(updated);
+  };
+
+  const handleClearAllSchedules = () => {
+    Alert.alert(
+      'Xóa toàn bộ lịch tưới?',
+      'Bạn có muốn xóa hết tất cả lịch hẹn giờ? Khi không có lịch, máy bơm sẽ luôn ở trạng thái NGHỈ an toàn và không bao giờ tự động bật.',
+      [
+        { text: 'Hủy', style: 'cancel' },
+        {
+          text: 'Xóa hết',
+          style: 'destructive',
+          onPress: () => saveSchedules([]),
+        },
+      ]
+    );
   };
 
   const handleApplyPreset = (preset: MelonPreset, replaceAll: boolean = true) => {
@@ -616,8 +632,8 @@ export default function ControlScreen() {
           {/* Mô tả ngắn gọn */}
           <Text style={styles.modeDesc}>
             {operatingMode === 'auto'
-              ? 'Tự động: Cảm biến & lịch trình chủ động đóng ngắt rơ-le.'
-              : 'Thủ công: Rơ-le hoạt động độc lập, tuân thủ 100% nút bấm.'}
+              ? 'Tự động: Tưới theo Lịch hẹn giờ. Bơm chỉ bật khi có lịch được kích hoạt.'
+              : 'Thủ công: Điều khiển bằng nút bấm. Khóa mọi lịch tưới tự động.'}
           </Text>
 
           {/* Cảnh báo ghi đè thủ công */}
@@ -703,6 +719,16 @@ export default function ControlScreen() {
             <SectionHeader title="Lịch tưới tự động" subtitle="Hẹn giờ bơm nước theo tuần / tháng" />
           </View>
           <View style={styles.scheduleActionBtns}>
+            {schedules.length > 0 && (
+              <Pressable
+                style={styles.clearAllSchedulesBtn}
+                onPress={handleClearAllSchedules}
+                hitSlop={8}
+              >
+                <Trash2 size={13} color={colors.danger} />
+                <Text style={styles.clearAllSchedulesBtnText}>Xóa hết</Text>
+              </Pressable>
+            )}
             <Pressable
               style={styles.melonPresetBtn}
               onPress={() => setIsPresetModalOpen(true)}
@@ -789,7 +815,10 @@ export default function ControlScreen() {
           {schedules.length === 0 ? (
             <View style={styles.scheduleEmptyBox}>
               <Clock size={28} color={colors.textMuted} />
-              <Text style={styles.scheduleEmptyText}>Chưa có lịch tưới. Nhấn "Mẫu Dưa Lưới" hoặc "+ Đặt Lịch".</Text>
+              <Text style={styles.scheduleEmptyTitle}>Chưa có lịch tưới nào</Text>
+              <Text style={styles.scheduleEmptyText}>
+                Máy bơm đang ở trạng thái NGHỈ và KHÔNG tự động bật cho đến khi bạn tạo lịch hoặc nạp Mẫu Dưa Lưới.
+              </Text>
             </View>
           ) : (
             schedules.map((item) => (
@@ -1499,10 +1528,17 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     gap: spacing.xs,
   },
+  scheduleEmptyTitle: {
+    fontSize: 13,
+    fontFamily: 'Inter-Bold',
+    color: colors.text,
+    marginTop: 4,
+  },
   scheduleEmptyText: {
     ...typography.bodySm,
     color: colors.textMuted,
     textAlign: 'center',
+    lineHeight: 18,
   },
   scheduleCard: {
     flexDirection: 'row',
@@ -1738,6 +1774,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs + 2,
+  },
+  clearAllSchedulesBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(239, 68, 68, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.20)',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs + 2,
+    borderRadius: radius.pill,
+    gap: 3,
+  },
+  clearAllSchedulesBtnText: {
+    fontSize: 11,
+    fontFamily: 'Inter-Medium',
+    color: colors.danger,
   },
   melonPresetBtn: {
     flexDirection: 'row',
