@@ -83,7 +83,9 @@ function ControlButtonComponent({
         <View style={styles.body}>
           <Text style={[styles.label, { color: isOn ? '#FFFFFF' : colors.text }]}>{device.label}</Text>
           <Text style={[styles.subLabel, { color: isOn ? 'rgba(255,255,255,0.85)' : colors.textMuted }]}>
-            Relay · {isOn ? 'Mạch đóng' : 'Mạch mở'}
+            {device.type === 'pump'
+              ? (isOn ? 'Đang bơm nước tưới' : 'Đang tạm dừng')
+              : (isOn ? 'Đang chiếu sáng' : 'Đang tắt đèn')}
           </Text>
         </View>
 

@@ -224,10 +224,10 @@ export default function DashboardScreen() {
               </View>
               <Text style={styles.irrigationAdvisoryText}>
                 {weather.rainProbability >= 60
-                  ? `Dự báo mưa cao (${weather.rainProbability}%): Thuật toán Smart Pump tạm hoãn chu kỳ tưới tiếp theo để chống ngập úng gốc dưa.`
+                  ? `Dự báo sắp có mưa (${weather.rainProbability}%): Tạm hoãn tưới nước để chống ngập úng, tránh thối gốc dưa.`
                   : weather.condition === 'sunny'
-                    ? `Nắng gắt lý tưởng: Tích phân quang hợp (DLI) cao, dưa đang tích lũy đường Brix tối ưu.`
-                    : `Thời tiết ổn định: Duy trì tưới nhỏ giọt theo độ ẩm giá thể thực tế.`}
+                    ? `Trời nắng đẹp: Cây quang hợp tốt, dưa đang tích lũy độ ngọt (Brix) thuận lợi.`
+                    : `Thời tiết thuận lợi: Giữ ẩm bầu dưa theo lịch tưới nhỏ giọt đều đặn.`}
               </Text>
             </View>
           </View>

@@ -642,15 +642,15 @@ export default function ControlScreen() {
               <View style={styles.overrideAlertLeft}>
                 <ShieldAlert size={16} color="#D97706" style={{ marginTop: 2 }} />
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.overrideAlertTitle}>Ghi đè thủ công</Text>
+                  <Text style={styles.overrideAlertTitle}>Đang bật/tắt bằng tay</Text>
                   <Text style={styles.overrideAlertDesc}>
-                    Tạm hoãn tự động đến <Text style={{ fontWeight: '700' }}>{overrideTimeFormatted}</Text>.
+                    Tạm dừng lịch tưới đến <Text style={{ fontWeight: '700' }}>{overrideTimeFormatted}</Text>.
                   </Text>
                 </View>
               </View>
               <Pressable onPress={handleResumeAuto} style={styles.resumeAutoBtn}>
                 <RotateCcw size={12} color={colors.primary[700]} />
-                <Text style={styles.resumeAutoBtnText}>Khôi phục Auto</Text>
+                <Text style={styles.resumeAutoBtnText}>Bật lại Tự động</Text>
               </Pressable>
             </View>
           )}
@@ -660,9 +660,9 @@ export default function ControlScreen() {
             <View style={styles.rainLockAlertBox}>
               <CloudRain size={16} color={colors.water[600]} style={{ marginTop: 2 }} />
               <View style={{ flex: 1 }}>
-                <Text style={styles.rainLockTitle}>🌧️ Khóa tưới do mưa ({weather.rainProbability}%)</Text>
+                <Text style={styles.rainLockTitle}>🌧️ Tránh tưới khi có mưa ({weather.rainProbability}%)</Text>
                 <Text style={styles.rainLockDesc}>
-                  Tạm dừng chu kỳ tưới tự động để bảo vệ bầu rễ.
+                  Hệ thống tạm ngưng tưới tự động để bảo vệ bầu dưa, chống úng rễ.
                 </Text>
               </View>
             </View>
@@ -712,11 +712,11 @@ export default function ControlScreen() {
           })}
         </View>
 
-        {/* Lịch tưới tự động */}
-        {/* Lịch tưới tự động */}
-        <View style={styles.scheduleHeaderRow}>
-          <View style={{ flex: 1 }}>
-            <SectionHeader title="Lịch tưới tự động" subtitle="Hẹn giờ bơm nước theo tuần / tháng" />
+        {/* Lịch tưới tự động - Tiêu đề và nút hành động xếp tầng thoáng đãng */}
+        <View style={styles.scheduleSectionHeader}>
+          <View style={styles.scheduleTitleWrap}>
+            <Text style={styles.scheduleTitleText}>Lịch tưới tự động</Text>
+            <Text style={styles.scheduleSubtitleText}>Hẹn giờ bơm nước tưới theo ngày</Text>
           </View>
           <View style={styles.scheduleActionBtns}>
             {schedules.length > 0 && (
@@ -1493,12 +1493,21 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     flex: 1,
   },
-  scheduleHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: spacing.md,
+  scheduleSectionHeader: {
+    marginTop: spacing.xl,
     marginBottom: spacing.xs,
+    gap: spacing.xs + 2,
+  },
+  scheduleTitleWrap: {
+    gap: 2,
+  },
+  scheduleTitleText: {
+    ...typography.h2,
+    color: colors.text,
+  },
+  scheduleSubtitleText: {
+    ...typography.bodySm,
+    color: colors.textMuted,
   },
   addScheduleBtn: {
     flexDirection: 'row',
@@ -1773,7 +1782,9 @@ const styles = StyleSheet.create({
   scheduleActionBtns: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs + 2,
+    gap: spacing.xs + 3,
+    marginTop: 4,
+    flexWrap: 'wrap',
   },
   clearAllSchedulesBtn: {
     flexDirection: 'row',
