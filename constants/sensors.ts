@@ -29,7 +29,7 @@ export const sensorMeta: Record<SensorType, SensorMeta> = {
     bg: 'rgba(217,130,43,0.10)',
     unit: '°C',
     decimals: 1,
-    hint: 'Cảm biến SHT31',
+    hint: 'Cảm biến DHT22',
   },
   airHumidity: {
     type: 'airHumidity',
@@ -39,7 +39,7 @@ export const sensorMeta: Record<SensorType, SensorMeta> = {
     bg: 'rgba(46,134,171,0.10)',
     unit: '%',
     decimals: 0,
-    hint: 'Cảm biến SHT31',
+    hint: 'Cảm biến DHT22',
   },
   soilMoisture: {
     type: 'soilMoisture',

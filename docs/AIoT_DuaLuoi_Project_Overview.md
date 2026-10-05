@@ -54,7 +54,7 @@
 graph TD
     subgraph "1. Lớp Thiết Bị Biên (Edge / Hardware)"
         ESP32["Vi điều khiển ESP32 WROOM-32"]
-        DHT["Cảm biến Nhiệt Ẩm DHT11 / DHT22 (1-Wire GPIO 4)"]
+        DHT["Cảm biến Nhiệt Ẩm DHT22 AM2302 (1-Wire GPIO 4)"]
         LDR1["Quang trở LDR 1 - Đỉnh tán lá (Analog GPIO 34 - ADC1)"]
         LDR2["Quang trở LDR 2 - Tầng quả (Analog GPIO 33 - ADC1)"]
         RAIN["Cảm biến Mưa Raindrops (Digital DO GPIO 32)"]
