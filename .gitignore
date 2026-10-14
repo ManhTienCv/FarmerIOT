@@ -43,3 +43,6 @@ firmware/**/*backup*
 firmware/hardware_diagnostics_test/
 
 firmware
+
+# reports & documents (local only)
+BaoCao/
