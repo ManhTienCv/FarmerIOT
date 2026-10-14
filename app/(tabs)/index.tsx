@@ -14,7 +14,12 @@ import ActiveCropBanner from '@/components/ActiveCropBanner';
 import VPDCard from '@/components/VPDCard';
 import { useTabVisibility } from '@/context/TabVisibilityContext';
 import { useCrop } from '@/context/CropContext';
-import { connectMqtt, subscribeSensors, subscribeConnection } from '@/services/mqttService';
+import {
+  connectMqtt,
+  subscribeSensors,
+  subscribeConnection,
+  subscribeHardwareStatus,
+} from '@/services/mqttService';
 
 export default function DashboardScreen() {
   const { onScroll } = useTabVisibility();
@@ -25,6 +30,7 @@ export default function DashboardScreen() {
   const [selected, setSelected] = useState<SensorType>('temperature');
   const [history, setHistory] = useState<{ time: string; value: number }[]>([]);
   const [isMqttOnline, setIsMqttOnline] = useState(false);
+  const [isHwOnline, setIsHwOnline] = useState(false);
   const [weather, setWeather] = useState<OutdoorWeather | null>(null);
   const [notifyModalVisible, setNotifyModalVisible] = useState(false);
 
@@ -61,9 +67,17 @@ export default function DashboardScreen() {
     const unsubConn = subscribeConnection((connected) => {
       setIsMqttOnline(connected);
     });
+    const unsubHw = subscribeHardwareStatus((online) => {
+      setIsHwOnline(online);
+      if (!online) {
+        setSensors([]);
+      }
+      setLoading(false);
+    });
     return () => {
       unsubSensors();
       unsubConn();
+      unsubHw();
     };
   }, []);
 
@@ -110,11 +124,11 @@ export default function DashboardScreen() {
     return getSensorStatus(s.value, optMin, optMax) !== 'optimal';
   });
 
-  if (loading && !sensors.length) {
+  if (loading && !weather) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color={colors.primary[400]} />
-        <Text style={styles.loadingText}>Đang tải dữ liệu cảm biến...</Text>
+        <Text style={styles.loadingText}>Đang khởi tạo hệ thống...</Text>
       </View>
     );
   }
@@ -146,22 +160,22 @@ export default function DashboardScreen() {
             <View
               style={[
                 styles.liveBadge,
-                isMqttOnline ? styles.cloudOnlineBadge : styles.cloudOfflineBadge,
+                isHwOnline ? styles.cloudOnlineBadge : styles.deviceOfflineBadge,
               ]}
             >
               <View
                 style={[
                   styles.liveDot,
-                  { backgroundColor: isMqttOnline ? '#10B981' : '#F59E0B' },
+                  { backgroundColor: isHwOnline ? '#10B981' : '#9CA3AF' },
                 ]}
               />
               <Text
                 style={[
                   styles.liveText,
-                  { color: isMqttOnline ? '#065F46' : '#92400E' },
+                  { color: isHwOnline ? '#065F46' : '#4B5563' },
                 ]}
               >
-                {isMqttOnline ? 'Cloud' : 'Offline'}
+                {isHwOnline ? 'Thiết bị Online' : 'Thiết bị Offline'}
               </Text>
             </View>
 
@@ -236,147 +250,175 @@ export default function DashboardScreen() {
         {/* Banner Vụ Mùa Chuyên Sâu Theo Cây Trồng */}
         <ActiveCropBanner />
 
-        {/* Quick stats */}
-        {stats && (
-          <View style={styles.statsRow}>
-            <View style={styles.statItem}>
-              <Activity size={16} color={colors.sun[500]} strokeWidth={2.2} />
-              <Text style={styles.statValue}>{stats.temp.toFixed(1)}°</Text>
-              <Text style={styles.statLabel}>Nhiệt độ</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <CloudRain size={16} color={colors.water[500]} strokeWidth={2.2} />
-              <Text style={styles.statValue}>{Math.round(stats.air)}%</Text>
-              <Text style={styles.statLabel}>Độ ẩm KK</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <Droplet size={16} color={colors.soil[500]} strokeWidth={2.2} />
-              <Text style={styles.statValue}>{Math.round(stats.soil)}%</Text>
-              <Text style={styles.statLabel}>Độ ẩm đất</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <Sun size={16} color={colors.sun[500]} strokeWidth={2.2} />
-              <Text style={styles.statValue}>{(stats.light / 1000).toFixed(1)}k</Text>
-              <Text style={styles.statLabel}>Ánh sáng</Text>
-            </View>
-          </View>
-        )}
-
-        {/* Thẻ chỉ số VPD Bốc thoát hơi nước & Vùng quang hợp cực đại */}
-        {stats && <VPDCard temperature={stats.temp} humidity={stats.air} />}
-
-        {/* Sensor cards grid với ngưỡng động theo cây */}
-        <SectionHeader
-          title="Cảm biến thời gian thực"
-          subtitle={`Ngưỡng chuẩn tối ưu: ${selectedCrop.name} (${currentStage.name})`}
-        />
-        {sensors.length === 0 ? (
+        {/* Hiển thị thông số cảm biến: CHỈ hiển thị khi ESP32 trực tuyến (Online) để tiết kiệm dung lượng */}
+        {!isHwOnline ? (
           <View style={styles.waitingCard}>
-            <ActivityIndicator size="small" color={colors.primary[500]} />
-            <Text style={styles.waitingTitle}>Đang đợi dữ liệu thực từ ESP32</Text>
+            <View style={styles.offlineIconCircle}>
+              <Activity size={24} color="#6B7280" strokeWidth={2.2} />
+            </View>
+            <Text style={styles.waitingTitle}>Bộ điều khiển ESP32 đang Ngoại tuyến</Text>
             <Text style={styles.waitingDesc}>
-              Hệ thống đã ngắt toàn bộ dữ liệu giả lập. Hãy cắm nguồn cho ESP32 ngoài vườn, các thông số cảm biến thực tế sẽ lập tức xuất hiện tại đây theo thời gian thực.
+              Hệ thống đã tự động ẩn toàn bộ thông số môi trường để tránh lưu trữ sai lệch và tiết kiệm dung lượng. Khi bạn cắm nguồn cho ESP32 ngoài vườn, các thông số cảm biến thời gian thực sẽ tự động xuất hiện.
             </Text>
+            <View style={styles.waitingStatusRow}>
+              <View
+                style={[
+                  styles.waitingStatusDot,
+                  { backgroundColor: isMqttOnline ? '#10B981' : '#F59E0B' },
+                ]}
+              />
+              <Text style={styles.waitingStatusText}>
+                {isMqttOnline
+                  ? 'Cloud Broker sẵn sàng · Đang chờ ESP32 kết nối...'
+                  : 'Đang kết nối lại Cloud Broker...'}
+              </Text>
+            </View>
           </View>
         ) : (
-          <View style={styles.grid}>
-            {sensors.map((s) => {
-              const range = getStageRange(s.type);
-              return (
-                <View key={s.type} style={styles.gridItem}>
-                  <SensorCard
-                    reading={s}
-                    optimalMin={range?.optimalMin}
-                    optimalMax={range?.optimalMax}
-                    cropTargetName={selectedCrop.name}
-                    onPress={() => setSelected(s.type)}
-                  />
-                </View>
-              );
-            })}
-          </View>
-        )}
-
-        {/* Chart */}
-        {selectedReading && (() => {
-          const selectedRange = getStageRange(selectedReading.type);
-          const selOptMin = selectedRange?.optimalMin ?? selectedReading.optimalMin;
-          const selOptMax = selectedRange?.optimalMax ?? selectedReading.optimalMax;
-          const selectedStatus = getSensorStatus(selectedReading.value, selOptMin, selOptMax);
-
-          return (
-            <>
-              <SectionHeader
-                title={`Biểu đồ ${selectedMeta.label.toLowerCase()}`}
-                subtitle={`Chuẩn ${selectedCrop.name}: ${selOptMin} - ${selOptMax} ${selectedMeta.unit}`}
-                right={`${selectedReading.value.toFixed(selectedMeta.decimals)} ${selectedMeta.unit}`}
-              />
-              <View style={styles.chartCard}>
-                <View style={styles.chartHeader}>
-                  <View style={[styles.chartIcon, { backgroundColor: selectedMeta.bg }]}>
-                    {(() => {
-                      const Icon = selectedMeta.icon;
-                      return <Icon size={18} color={selectedMeta.color} strokeWidth={2.2} />;
-                    })()}
-                  </View>
-                  <Text style={styles.chartLabel}>{selectedMeta.label}</Text>
-                  <View style={[styles.chartPill, { backgroundColor: `${statusColor[selectedStatus]}22` }]}>
-                    <Text style={[styles.chartPillText, { color: statusColor[selectedStatus] }]}>
-                      {statusLabel[selectedStatus]}
-                    </Text>
-                  </View>
-                </View>
-                {history.length >= 2 ? (
-                  <MiniChart data={history} color={selectedMeta.color} height={140} />
-                ) : (
-                  <View style={styles.chartEmpty}>
-                    <Text style={styles.chartEmptyText}>
-                      {history.length === 1
-                        ? 'Đã ghi nhận 1 điểm đo. Cần thêm dữ liệu theo thời gian để vẽ đường cong...'
-                        : 'Đang tích lũy các điểm đo thực tế từ cảm biến...'}
-                    </Text>
-                  </View>
-                )}
-              </View>
-            </>
-          );
-        })()}
-
-        {/* Alerts */}
-        {alerts.length > 0 && (
           <>
+            {/* Quick stats */}
+            {stats && (
+              <View style={styles.statsRow}>
+                <View style={styles.statItem}>
+                  <Activity size={16} color={colors.sun[500]} strokeWidth={2.2} />
+                  <Text style={styles.statValue}>{stats.temp.toFixed(1)}°</Text>
+                  <Text style={styles.statLabel}>Nhiệt độ</Text>
+                </View>
+                <View style={styles.statDivider} />
+                <View style={styles.statItem}>
+                  <CloudRain size={16} color={colors.water[500]} strokeWidth={2.2} />
+                  <Text style={styles.statValue}>{Math.round(stats.air)}%</Text>
+                  <Text style={styles.statLabel}>Độ ẩm KK</Text>
+                </View>
+                <View style={styles.statDivider} />
+                <View style={styles.statItem}>
+                  <Droplet size={16} color={colors.soil[500]} strokeWidth={2.2} />
+                  <Text style={styles.statValue}>{Math.round(stats.soil)}%</Text>
+                  <Text style={styles.statLabel}>Độ ẩm đất</Text>
+                </View>
+                <View style={styles.statDivider} />
+                <View style={styles.statItem}>
+                  <Sun size={16} color={colors.sun[500]} strokeWidth={2.2} />
+                  <Text style={styles.statValue}>{(stats.light / 1000).toFixed(1)}k</Text>
+                  <Text style={styles.statLabel}>Ánh sáng</Text>
+                </View>
+              </View>
+            )}
+
+            {/* Thẻ chỉ số VPD Bốc thoát hơi nước & Vùng quang hợp cực đại */}
+            {stats && <VPDCard temperature={stats.temp} humidity={stats.air} />}
+
+            {/* Sensor cards grid với ngưỡng động theo cây */}
             <SectionHeader
-              title="Cảnh báo đang hoạt động"
-              subtitle={`${alerts.length} thông số lệch chuẩn ${selectedCrop.name} (${currentStage.name})`}
+              title="Cảm biến thời gian thực"
+              subtitle={`Ngưỡng chuẩn tối ưu: ${selectedCrop.name} (${currentStage.name})`}
             />
-            <View style={styles.alertsWrap}>
-              {alerts.map((s) => {
-                const meta = sensorMeta[s.type];
-                const range = getStageRange(s.type);
-                const optMin = range ? range.optimalMin : s.optimalMin;
-                const optMax = range ? range.optimalMax : s.optimalMax;
-                const status = getSensorStatus(s.value, optMin, optMax);
-                const Icon = meta.icon;
-                return (
-                  <View key={s.type} style={[styles.alertItem, { borderLeftColor: statusColor[status] }]}>
-                    <View style={[styles.alertIcon, { backgroundColor: `${statusColor[status]}22` }]}>
-                      <Icon size={18} color={statusColor[status]} strokeWidth={2.2} />
+            {sensors.length === 0 ? (
+              <View style={styles.waitingCard}>
+                <ActivityIndicator size="small" color={colors.primary[500]} />
+                <Text style={styles.waitingTitle}>Đang kết nối nhận dữ liệu từ ESP32</Text>
+                <Text style={styles.waitingDesc}>
+                  Hệ thống đang đồng bộ gói tin cảm biến thời gian thực đầu tiên từ vườn...
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.grid}>
+                {sensors.map((s) => {
+                  const range = getStageRange(s.type);
+                  return (
+                    <View key={s.type} style={styles.gridItem}>
+                      <SensorCard
+                        reading={s}
+                        optimalMin={range?.optimalMin}
+                        optimalMax={range?.optimalMax}
+                        cropTargetName={selectedCrop.name}
+                        onPress={() => setSelected(s.type)}
+                      />
                     </View>
-                    <View style={styles.alertBody}>
-                      <Text style={styles.alertTitle}>{meta.label}</Text>
-                      <Text style={styles.alertDesc}>
-                        {status === 'low'
-                          ? `Thấp: ${s.value.toFixed(meta.decimals)}${meta.unit} (chuẩn ${selectedCrop.name}: ${optMin}–${optMax})`
-                          : `Cao: ${s.value.toFixed(meta.decimals)}${meta.unit} (chuẩn ${selectedCrop.name}: ${optMin}–${optMax})`}
-                      </Text>
+                  );
+                })}
+              </View>
+            )}
+
+            {/* Chart */}
+            {selectedReading && (() => {
+              const selectedRange = getStageRange(selectedReading.type);
+              const selOptMin = selectedRange?.optimalMin ?? selectedReading.optimalMin;
+              const selOptMax = selectedRange?.optimalMax ?? selectedReading.optimalMax;
+              const selectedStatus = getSensorStatus(selectedReading.value, selOptMin, selOptMax);
+
+              return (
+                <>
+                  <SectionHeader
+                    title={`Biểu đồ ${selectedMeta.label.toLowerCase()}`}
+                    subtitle={`Chuẩn ${selectedCrop.name}: ${selOptMin} - ${selOptMax} ${selectedMeta.unit}`}
+                    right={`${selectedReading.value.toFixed(selectedMeta.decimals)} ${selectedMeta.unit}`}
+                  />
+                  <View style={styles.chartCard}>
+                    <View style={styles.chartHeader}>
+                      <View style={[styles.chartIcon, { backgroundColor: selectedMeta.bg }]}>
+                        {(() => {
+                          const Icon = selectedMeta.icon;
+                          return <Icon size={18} color={selectedMeta.color} strokeWidth={2.2} />;
+                        })()}
+                      </View>
+                      <Text style={styles.chartLabel}>{selectedMeta.label}</Text>
+                      <View style={[styles.chartPill, { backgroundColor: `${statusColor[selectedStatus]}22` }]}>
+                        <Text style={[styles.chartPillText, { color: statusColor[selectedStatus] }]}>
+                          {statusLabel[selectedStatus]}
+                        </Text>
+                      </View>
                     </View>
+                    {history.length >= 2 ? (
+                      <MiniChart data={history} color={selectedMeta.color} height={140} />
+                    ) : (
+                      <View style={styles.chartEmpty}>
+                        <Text style={styles.chartEmptyText}>
+                          {history.length === 1
+                            ? 'Đã ghi nhận 1 điểm đo. Cần thêm dữ liệu theo thời gian để vẽ đường cong...'
+                            : 'Đang tích lũy các điểm đo thực tế từ cảm biến...'}
+                        </Text>
+                      </View>
+                    )}
                   </View>
-                );
-              })}
-            </View>
+                </>
+              );
+            })()}
+
+            {/* Alerts */}
+            {alerts.length > 0 && (
+              <>
+                <SectionHeader
+                  title="Cảnh báo đang hoạt động"
+                  subtitle={`${alerts.length} thông số lệch chuẩn ${selectedCrop.name} (${currentStage.name})`}
+                />
+                <View style={styles.alertsWrap}>
+                  {alerts.map((s) => {
+                    const meta = sensorMeta[s.type];
+                    const range = getStageRange(s.type);
+                    const optMin = range ? range.optimalMin : s.optimalMin;
+                    const optMax = range ? range.optimalMax : s.optimalMax;
+                    const status = getSensorStatus(s.value, optMin, optMax);
+                    const Icon = meta.icon;
+                    return (
+                      <View key={s.type} style={[styles.alertItem, { borderLeftColor: statusColor[status] }]}>
+                        <View style={[styles.alertIcon, { backgroundColor: `${statusColor[status]}22` }]}>
+                          <Icon size={18} color={statusColor[status]} strokeWidth={2.2} />
+                        </View>
+                        <View style={styles.alertBody}>
+                          <Text style={styles.alertTitle}>{meta.label}</Text>
+                          <Text style={styles.alertDesc}>
+                            {status === 'low'
+                              ? `Thấp: ${s.value.toFixed(meta.decimals)}${meta.unit} (chuẩn ${selectedCrop.name}: ${optMin}–${optMax})`
+                              : `Cao: ${s.value.toFixed(meta.decimals)}${meta.unit} (chuẩn ${selectedCrop.name}: ${optMin}–${optMax})`}
+                          </Text>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              </>
+            )}
           </>
         )}
 
@@ -532,6 +574,7 @@ const styles = StyleSheet.create({
   liveAlert: { backgroundColor: 'rgba(214,64,69,0.10)' },
   cloudOnlineBadge: { backgroundColor: 'rgba(16,185,129,0.12)' },
   cloudOfflineBadge: { backgroundColor: 'rgba(245,158,11,0.12)' },
+  deviceOfflineBadge: { backgroundColor: 'rgba(156,163,175,0.16)' },
   liveDot: {
     width: 8,
     height: 8,
@@ -758,6 +801,35 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 20,
     paddingHorizontal: spacing.md,
+  },
+  offlineIconCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.xs,
+  },
+  waitingStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: spacing.xs,
+    backgroundColor: colors.surfaceAlt,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2,
+    borderRadius: radius.pill,
+  },
+  waitingStatusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  waitingStatusText: {
+    ...typography.caption,
+    color: colors.textMuted,
+    fontFamily: 'Inter-Medium',
   },
   chartEmpty: {
     paddingVertical: spacing.xl,

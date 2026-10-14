@@ -133,6 +133,34 @@ export function getCurrentStage(crop: CropProfile, stageIndex: number): CropStag
 }
 
 /**
+ * Tự động xác định index giai đoạn sinh trưởng tương ứng với ngày trồng
+ */
+export function getStageIndexForDay(crop: CropProfile, day: number): number {
+  if (!crop.stages || crop.stages.length === 0) return 0;
+  let cumulativeDays = 0;
+  for (let i = 0; i < crop.stages.length; i++) {
+    cumulativeDays += crop.stages[i].durationDays;
+    if (day <= cumulativeDays) {
+      return i;
+    }
+  }
+  return crop.stages.length - 1;
+}
+
+/**
+ * Lấy ngày bắt đầu của một giai đoạn sinh trưởng (1-indexed)
+ */
+export function getStartDayForStage(crop: CropProfile, stageIndex: number): number {
+  if (!crop.stages || crop.stages.length === 0 || stageIndex <= 0) return 1;
+  const targetIdx = Math.min(stageIndex, crop.stages.length - 1);
+  let startDay = 1;
+  for (let i = 0; i < targetIdx; i++) {
+    startDay += crop.stages[i].durationDays;
+  }
+  return startDay;
+}
+
+/**
  * Tìm kiếm không dấu tiếng Việt cho ô tìm kiếm E-Commerce
  */
 export function normalizeVietnamese(str: string): string {

@@ -8,6 +8,7 @@ import {
   SlidersHorizontal,
   Plus,
   Minus,
+  RotateCcw,
 } from 'lucide-react-native';
 import { colors, radius, shadows, spacing, typography } from '@/constants/theme';
 import { useCrop } from '@/context/CropContext';
@@ -24,6 +25,7 @@ export default function ActiveCropBanner({ onPressManage }: ActiveCropBannerProp
     dayOfCrop,
     setStageIndex,
     setDayOfCrop,
+    resetCropToDayOne,
   } = useCrop();
 
   const progressPercent = Math.min(
@@ -82,6 +84,14 @@ export default function ActiveCropBanner({ onPressManage }: ActiveCropBannerProp
             </View>
 
             <View style={styles.dayControls}>
+              <Pressable
+                onPress={resetCropToDayOne}
+                style={styles.resetCropBtn}
+                hitSlop={6}
+              >
+                <RotateCcw size={10} color={colors.primary[600]} />
+                <Text style={styles.resetCropBtnText}>Vụ mới (Ngày 1)</Text>
+              </Pressable>
               <Pressable
                 onPress={() => setDayOfCrop(dayOfCrop - 1)}
                 style={styles.dayStepBtn}
@@ -301,6 +311,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+  },
+  resetCropBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(45, 106, 79, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(45, 106, 79, 0.22)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
+  },
+  resetCropBtnText: {
+    fontSize: 10,
+    fontFamily: 'Inter-SemiBold',
+    color: colors.primary[700],
   },
   dayStepBtn: {
     width: 22,

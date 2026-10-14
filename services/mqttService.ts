@@ -20,6 +20,7 @@ const MQTT_PASSWORD = process.env.EXPO_PUBLIC_MQTT_PASSWORD || 'farmerbig12!';
 
 // Topics chuẩn hoá
 export const TOPIC_SENSORS = 'farm/sensors';
+export const TOPIC_STATUS = 'farm/status';
 export const TOPIC_CONTROL_PREFIX = 'farm/control/';
 export const TOPIC_STATE_PREFIX = 'farm/state/';
 export const TOPIC_STATE_WILDCARD = 'farm/state/+';
@@ -31,6 +32,14 @@ let client: Paho.Client | null = null;
 let isConnected = false;
 let isConnecting = false;
 let reconnectTimer: any = null;
+
+// Quản lý trạng thái phần cứng ESP32 trực tuyến (Hardware Online)
+let lastTelemetryTime = 0;
+let isHardwareConnected = false;
+let hardwareWatchdogTimer: any = null;
+
+export type HardwareStatusListener = (online: boolean) => void;
+const hardwareListeners = new Set<HardwareStatusListener>();
 
 // Cache dữ liệu mới nhất nhận từ MQTT
 let latestSensors: SensorReading[] | null = null;
@@ -68,8 +77,42 @@ function notifyConnection(status: boolean) {
   });
 }
 
+function notifyHardwareStatus(online: boolean) {
+  isHardwareConnected = online;
+  hardwareListeners.forEach((listener) => {
+    try {
+      listener(online);
+    } catch (err) {
+      console.warn('[MQTT] Lỗi trong hardwareListener:', err);
+    }
+  });
+}
+
+function startHardwareWatchdog() {
+  if (hardwareWatchdogTimer) return;
+  hardwareWatchdogTimer = setInterval(() => {
+    const now = Date.now();
+    // Nếu quá 15 giây không có gói tin telemetry nào từ ESP32, coi như phần cứng đang tắt/ngoại tuyến
+    if (isHardwareConnected && (now - lastTelemetryTime > 15000)) {
+      isHardwareConnected = false;
+      latestSensors = null;
+      notifyHardwareStatus(false);
+      notifySensors([]);
+    }
+  }, 3000);
+}
+
 function notifySensors(sensors: SensorReading[]) {
-  if (!sensors || sensors.length === 0) return;
+  if (!sensors || sensors.length === 0) {
+    sensorListeners.forEach((listener) => {
+      try {
+        listener([]);
+      } catch (err) {
+        console.warn('[MQTT] Lỗi trong sensorListener:', err);
+      }
+    });
+    return;
+  }
   latestSensors = sensors;
   saveRealSensors(sensors).catch(() => {});
   logSensorTelemetryToDatabase(sensors).catch(() => {});
@@ -96,15 +139,7 @@ function notifyDevice(device: DeviceState) {
   });
 }
 
-// Khởi động: Đọc các chỉ số thực tế đã lưu trước đó từ bộ nhớ cục bộ
-getStoredSensors()
-  .then((stored) => {
-    if (stored && stored.length > 0 && !latestSensors) {
-      latestSensors = stored;
-    }
-  })
-  .catch(() => {});
-
+// Khởi động thiết bị từ bộ nhớ cục bộ
 getStoredDevices()
   .then((stored) => {
     if (stored && stored.length > 0) {
@@ -198,6 +233,10 @@ export function connectMqtt(): void {
     client.onConnectionLost = (responseObject) => {
       isConnecting = false;
       notifyConnection(false);
+      isHardwareConnected = false;
+      latestSensors = null;
+      notifyHardwareStatus(false);
+      notifySensors([]);
       console.warn('[MQTT] Mất kết nối tới HiveMQ Cloud:', responseObject.errorMessage);
 
       // Thử kết nối lại sau 5 giây nếu không phải do disconnect chủ động
@@ -216,13 +255,41 @@ export function connectMqtt(): void {
       try {
         const data = JSON.parse(payloadStr);
 
+        // Nhận trạng thái sống của ESP32 (LWT hoặc online flag)
+        if (topic === TOPIC_STATUS) {
+          if (data && data.online === false) {
+            lastTelemetryTime = 0;
+            isHardwareConnected = false;
+            latestSensors = null;
+            notifyHardwareStatus(false);
+            notifySensors([]);
+          } else if (data && data.online === true) {
+            lastTelemetryTime = Date.now();
+            if (!isHardwareConnected) {
+              isHardwareConnected = true;
+              notifyHardwareStatus(true);
+            }
+          }
+          return;
+        }
+
         // Nhận dữ liệu cảm biến
         if (topic === TOPIC_SENSORS) {
+          lastTelemetryTime = Date.now();
+          if (!isHardwareConnected) {
+            isHardwareConnected = true;
+            notifyHardwareStatus(true);
+          }
           const parsed = parseSensorPayload(data);
           notifySensors(parsed);
         }
         // Nhận phản hồi trạng thái thiết bị từ ESP32 (vd: farm/state/pump)
         else if (topic.startsWith(TOPIC_STATE_PREFIX)) {
+          lastTelemetryTime = Date.now();
+          if (!isHardwareConnected) {
+            isHardwareConnected = true;
+            notifyHardwareStatus(true);
+          }
           const type = topic.replace(TOPIC_STATE_PREFIX, '') as DeviceType;
           if (type === 'pump' || type === 'growLight') {
             const devState: DeviceState = {
@@ -249,17 +316,22 @@ export function connectMqtt(): void {
       onSuccess: () => {
         isConnecting = false;
         notifyConnection(true);
+        startHardwareWatchdog();
         console.log('[MQTT] Kết nối thành công tới HiveMQ Cloud!');
 
-        // Đăng ký nhận dữ liệu cảm biến và phản hồi thiết bị
+        // Đăng ký nhận dữ liệu cảm biến, trạng thái phần cứng và phản hồi thiết bị
         if (client) {
           client.subscribe(TOPIC_SENSORS, { qos: 0 });
+          client.subscribe(TOPIC_STATUS, { qos: 0 });
           client.subscribe(TOPIC_STATE_WILDCARD, { qos: 0 });
         }
       },
       onFailure: (err) => {
         isConnecting = false;
         notifyConnection(false);
+        isHardwareConnected = false;
+        latestSensors = null;
+        notifyHardwareStatus(false);
         console.warn('[MQTT] Kết nối thất bại:', err.errorMessage);
 
         if (reconnectTimer) clearTimeout(reconnectTimer);
@@ -271,6 +343,9 @@ export function connectMqtt(): void {
   } catch (err) {
     isConnecting = false;
     notifyConnection(false);
+    isHardwareConnected = false;
+    latestSensors = null;
+    notifyHardwareStatus(false);
     console.error('[MQTT] Lỗi khởi tạo client:', err);
   }
 }
@@ -279,6 +354,10 @@ export function disconnectMqtt(): void {
   if (reconnectTimer) {
     clearTimeout(reconnectTimer);
     reconnectTimer = null;
+  }
+  if (hardwareWatchdogTimer) {
+    clearInterval(hardwareWatchdogTimer);
+    hardwareWatchdogTimer = null;
   }
   if (client && isConnected) {
     try {
@@ -289,7 +368,10 @@ export function disconnectMqtt(): void {
   }
   isConnected = false;
   isConnecting = false;
+  isHardwareConnected = false;
+  latestSensors = null;
   notifyConnection(false);
+  notifyHardwareStatus(false);
 }
 
 // ============================================================
@@ -402,8 +484,10 @@ export async function sendMqttSchedules(schedules: any[]): Promise<boolean> {
 // ============================================================
 export function subscribeSensors(callback: SensorListener): () => void {
   sensorListeners.add(callback);
-  if (latestSensors) {
+  if (latestSensors && isHardwareOnline()) {
     callback(latestSensors);
+  } else {
+    callback([]);
   }
   return () => {
     sensorListeners.delete(callback);
@@ -427,11 +511,24 @@ export function subscribeConnection(callback: ConnectionListener): () => void {
   };
 }
 
+export function isHardwareOnline(): boolean {
+  return isConnected && isHardwareConnected && (Date.now() - lastTelemetryTime < 15000) && lastTelemetryTime > 0;
+}
+
+export function subscribeHardwareStatus(callback: HardwareStatusListener): () => void {
+  hardwareListeners.add(callback);
+  callback(isHardwareOnline());
+  return () => {
+    hardwareListeners.delete(callback);
+  };
+}
+
 export function isMqttActive(): boolean {
   return isConnected;
 }
 
 export function getCachedSensors(): SensorReading[] | null {
+  if (!isHardwareOnline()) return null;
   return latestSensors;
 }
 

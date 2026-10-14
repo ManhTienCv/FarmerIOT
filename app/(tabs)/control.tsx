@@ -913,14 +913,6 @@ export default function ControlScreen() {
           })}
         </View>
 
-        {/* Info note */}
-        <View style={styles.infoNote}>
-          <Activity size={16} color={colors.primary[400]} strokeWidth={2.2} />
-          <Text style={styles.infoText}>
-            Hệ thống đồng bộ hai chiều thời gian thực qua HiveMQ Cloud TLS 8883.
-          </Text>
-        </View>
-
         <View style={{ height: spacing.xl }} />
       </ScrollView>
 

@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from '
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { CropProfile, CropStageConfig, CropCategory } from '@/types/crop';
 import { INITIAL_CROPS } from '@/constants/cropDatabase';
-import { getCurrentStage, matchesSearchQuery } from '@/utils/agronomy';
+import { getCurrentStage, getStageIndexForDay, getStartDayForStage, matchesSearchQuery } from '@/utils/agronomy';
 import { generateCropProfileWithAI } from '@/services/aiCropProfiler';
 
 const STORAGE_KEY_SELECTED_CROP_ID = '@aiot_selected_crop_id';
@@ -21,6 +21,7 @@ interface CropContextType {
   changeCrop: (crop: CropProfile) => void;
   setStageIndex: (index: number) => void;
   setDayOfCrop: (day: number) => void;
+  resetCropToDayOne: () => void;
   generateAndAddCustomCrop: (cropName: string) => Promise<CropProfile>;
   deleteCustomCrop: (cropId: string) => void;
   searchCrops: (query: string, category?: CropCategory | 'all') => CropProfile[];
@@ -58,21 +59,17 @@ export function CropProvider({ children }: { children: React.ReactNode }) {
         let targetCrop = INITIAL_CROPS[0];
         setSelectedCrop(targetCrop);
 
-        if (savedStage !== null) {
-          const parsed = Number(savedStage);
-          const maxIdx = Math.max(0, (targetCrop.stages?.length ?? 1) - 1);
-          setSelectedStageIndex(isNaN(parsed) ? 0 : Math.min(Math.max(0, parsed), maxIdx));
-        } else {
-          setSelectedStageIndex(0);
-        }
-
+        let initialDay = 1;
         if (savedDay !== null) {
           const parsed = Number(savedDay);
           const maxDay = targetCrop.totalDays || 75;
-          setDayOfCropState(isNaN(parsed) ? 1 : Math.min(Math.max(1, parsed), maxDay));
-        } else {
-          setDayOfCropState(1);
+          initialDay = isNaN(parsed) ? 1 : Math.min(Math.max(1, parsed), maxDay);
         }
+        setDayOfCropState(initialDay);
+
+        // Tự động đồng bộ giai đoạn chuẩn xác tuyệt đối theo ngày trồng
+        const syncedStage = getStageIndexForDay(targetCrop, initialDay);
+        setSelectedStageIndex(syncedStage);
       } catch (err) {
         console.warn('Lỗi khi nạp dữ liệu cây trồng từ Storage:', err);
       }
@@ -96,16 +93,36 @@ export function CropProvider({ children }: { children: React.ReactNode }) {
     AsyncStorage.setItem(STORAGE_KEY_DAY_OF_CROP, '1').catch(() => {});
   };
 
+  // Khi chọn một giai đoạn sinh trưởng: Tự động nhảy sang ngày đầu tiên của giai đoạn đó
   const setStageIndex = (index: number) => {
     const validIdx = Math.min(Math.max(0, index), selectedCrop.stages.length - 1);
     setSelectedStageIndex(validIdx);
     AsyncStorage.setItem(STORAGE_KEY_STAGE_INDEX, String(validIdx)).catch(() => {});
+
+    const targetDay = getStartDayForStage(selectedCrop, validIdx);
+    setDayOfCropState(targetDay);
+    AsyncStorage.setItem(STORAGE_KEY_DAY_OF_CROP, String(targetDay)).catch(() => {});
   };
 
+  // Khi thay đổi ngày trồng: Tự động tính toán và đồng bộ giai đoạn sinh trưởng
   const setDayOfCrop = (day: number) => {
-    const validDay = Math.min(Math.max(1, day), selectedCrop.totalDays);
+    const validDay = Math.min(Math.max(1, day), selectedCrop.totalDays || 75);
     setDayOfCropState(validDay);
     AsyncStorage.setItem(STORAGE_KEY_DAY_OF_CROP, String(validDay)).catch(() => {});
+
+    const targetStage = getStageIndexForDay(selectedCrop, validDay);
+    if (targetStage !== selectedStageIndex) {
+      setSelectedStageIndex(targetStage);
+      AsyncStorage.setItem(STORAGE_KEY_STAGE_INDEX, String(targetStage)).catch(() => {});
+    }
+  };
+
+  // Đặt lại ngày trồng về Ngày 1 (Bắt đầu vụ mới)
+  const resetCropToDayOne = () => {
+    setDayOfCropState(1);
+    setSelectedStageIndex(0);
+    AsyncStorage.setItem(STORAGE_KEY_DAY_OF_CROP, '1').catch(() => {});
+    AsyncStorage.setItem(STORAGE_KEY_STAGE_INDEX, '0').catch(() => {});
   };
 
   const generateAndAddCustomCrop = async (cropName: string): Promise<CropProfile> => {
@@ -159,6 +176,7 @@ export function CropProvider({ children }: { children: React.ReactNode }) {
         changeCrop,
         setStageIndex,
         setDayOfCrop,
+        resetCropToDayOne,
         generateAndAddCustomCrop,
         deleteCustomCrop,
         searchCrops,

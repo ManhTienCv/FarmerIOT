@@ -123,18 +123,13 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 // ---------- Cảm biến ----------
 export async function getSensors(): Promise<SensorReading[]> {
-  // 1. Dữ liệu thời gian thực nhận từ MQTT Cloud
+  // 1. Dữ liệu thời gian thực nhận từ MQTT Cloud (chỉ khi thiết bị phần cứng Online)
   const cached = getCachedSensors();
   if (cached && cached.length > 0) {
     return cached;
   }
-  // 2. Dữ liệu thực tế đã lưu trước đó trong bộ nhớ
-  const stored = await getStoredSensors();
-  if (stored && stored.length > 0) {
-    return stored;
-  }
 
-  // 3. Thử gọi API LAN nội bộ nếu có
+  // 2. Thử gọi API LAN nội bộ nếu thiết bị đang cùng mạng WiFi
   try {
     return await request<SensorReading[]>('/sensors');
   } catch {
