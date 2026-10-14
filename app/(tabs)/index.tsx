@@ -1,12 +1,36 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { CloudRain, Droplet, Sun, Activity, CloudSun, ShieldAlert, Sparkles, Bell, X, CheckCircle2, AlertTriangle } from 'lucide-react-native';
+import {
+  CloudRain,
+  Droplet,
+  Sun,
+  Activity,
+  CloudSun,
+  ShieldAlert,
+  Sparkles,
+  Bell,
+  X,
+  CheckCircle2,
+  AlertTriangle,
+  MoonStar,
+  CloudMoon,
+  CloudLightning,
+  MapPin,
+  Check,
+} from 'lucide-react-native';
 import type { SensorReading, SensorType } from '@/types';
 import { colors, radius, shadows, spacing, typography } from '@/constants/theme';
 import { getSensors, getSensorHistory } from '@/services/api';
 import { sensorMeta, getSensorStatus, statusLabel, statusColor } from '@/constants/sensors';
-import { getOutdoorWeather, type OutdoorWeather } from '@/services/weather';
+import {
+  getOutdoorWeather,
+  type OutdoorWeather,
+  VIETNAM_FARM_LOCATIONS,
+  type FarmLocation,
+  getSavedFarmLocation,
+  saveFarmLocation,
+} from '@/services/weather';
 import SensorCard from '@/components/SensorCard';
 import SectionHeader from '@/components/SectionHeader';
 import MiniChart from '@/components/MiniChart';
@@ -32,15 +56,18 @@ export default function DashboardScreen() {
   const [isMqttOnline, setIsMqttOnline] = useState(false);
   const [isHwOnline, setIsHwOnline] = useState(false);
   const [weather, setWeather] = useState<OutdoorWeather | null>(null);
+  const [currentLocation, setCurrentLocation] = useState<FarmLocation>(VIETNAM_FARM_LOCATIONS[0]);
+  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
   const [notifyModalVisible, setNotifyModalVisible] = useState(false);
 
-  const load = useCallback(async (isRefresh = false) => {
+  const load = useCallback(async (isRefresh = false, loc?: FarmLocation) => {
     if (isRefresh) setRefreshing(true);
+    const targetLoc = loc || currentLocation;
     try {
       const [s, h, w] = await Promise.all([
         getSensors(),
         getSensorHistory(selected, 12),
-        getOutdoorWeather().catch(() => null),
+        getOutdoorWeather(targetLoc.latitude, targetLoc.longitude, targetLoc.name).catch(() => null),
       ]);
       setSensors(s);
       setHistory(h);
@@ -51,11 +78,22 @@ export default function DashboardScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [selected]);
+  }, [selected, currentLocation]);
 
+  // Nạp vị trí vườn dưa lưới đã lưu và cập nhật thời tiết tương ứng
   useEffect(() => {
-    load();
-  }, [load]);
+    getSavedFarmLocation().then((loc) => {
+      setCurrentLocation(loc);
+      load(false, loc);
+    });
+  }, []);
+
+  const handleSelectLocation = async (loc: FarmLocation) => {
+    setCurrentLocation(loc);
+    setIsLocationModalOpen(false);
+    await saveFarmLocation(loc);
+    load(false, loc);
+  };
 
   // Kết nối MQTT Broker trên HiveMQ Cloud và đăng ký nhận dữ liệu thời gian thực
   useEffect(() => {
@@ -200,9 +238,33 @@ export default function DashboardScreen() {
           <View style={styles.weatherBanner}>
             <View style={styles.weatherTopRow}>
               <View style={styles.weatherLeft}>
-                <View style={styles.weatherIconCircle}>
-                  {weather.rainProbability >= 60 ? (
+                <View
+                  style={[
+                    styles.weatherIconCircle,
+                    {
+                      backgroundColor:
+                        weather.rainProbability >= 60 || weather.condition === 'rainy'
+                          ? '#E0F2FE'
+                          : weather.condition === 'stormy'
+                            ? '#FEF3C7'
+                            : !weather.isDay
+                              ? '#EEF2FF'
+                              : weather.condition === 'sunny'
+                                ? '#FEF3C7'
+                                : 'rgba(45,106,79,0.1)',
+                    },
+                  ]}
+                >
+                  {weather.rainProbability >= 60 || weather.condition === 'rainy' ? (
                     <CloudRain size={20} color={colors.water[500]} strokeWidth={2.2} />
+                  ) : weather.condition === 'stormy' ? (
+                    <CloudLightning size={20} color="#D97706" strokeWidth={2.2} />
+                  ) : !weather.isDay ? (
+                    weather.condition === 'clear_night' ? (
+                      <MoonStar size={20} color="#6366F1" strokeWidth={2.2} />
+                    ) : (
+                      <CloudMoon size={20} color="#818CF8" strokeWidth={2.2} />
+                    )
                   ) : weather.condition === 'sunny' ? (
                     <Sun size={20} color={colors.sun[500]} strokeWidth={2.2} />
                   ) : (
@@ -211,9 +273,29 @@ export default function DashboardScreen() {
                 </View>
                 <View style={styles.weatherTextWrap}>
                   <View style={styles.weatherCityRow}>
-                    <Text style={styles.weatherCityText}>{weather.locationName}</Text>
-                    <View style={styles.weatherBadge}>
-                      <Text style={styles.weatherBadgeText}>{weather.temperature}°C · {weather.humidity}% ẩm</Text>
+                    <Pressable
+                      style={styles.weatherCityPressable}
+                      onPress={() => setIsLocationModalOpen(true)}
+                      hitSlop={6}
+                    >
+                      <MapPin size={13} color={colors.primary[600]} />
+                      <Text style={styles.weatherCityText}>{weather.locationName}</Text>
+                      <Text style={styles.weatherChangeHint}>(Đổi)</Text>
+                    </Pressable>
+                    <View
+                      style={[
+                        styles.weatherBadge,
+                        !weather.isDay && styles.weatherBadgeNight,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.weatherBadgeText,
+                          !weather.isDay && styles.weatherBadgeTextNight,
+                        ]}
+                      >
+                        {weather.temperature}°C · {weather.humidity}% ẩm
+                      </Text>
                     </View>
                   </View>
                   <Text style={styles.weatherDesc} numberOfLines={1}>
@@ -226,12 +308,18 @@ export default function DashboardScreen() {
             <View
               style={[
                 styles.irrigationAdvisoryRow,
-                weather.rainProbability >= 60 ? styles.rainLockBox : styles.normalIrrigationBox,
+                weather.rainProbability >= 60
+                  ? styles.rainLockBox
+                  : !weather.isDay
+                    ? styles.nightAdvisoryBox
+                    : styles.normalIrrigationBox,
               ]}
             >
               <View style={styles.irrigationIconWrap}>
                 {weather.rainProbability >= 60 ? (
                   <ShieldAlert size={14} color="#D97706" />
+                ) : !weather.isDay ? (
+                  <MoonStar size={14} color="#6366F1" />
                 ) : (
                   <Sparkles size={14} color={colors.primary[600]} />
                 )}
@@ -239,9 +327,11 @@ export default function DashboardScreen() {
               <Text style={styles.irrigationAdvisoryText}>
                 {weather.rainProbability >= 60
                   ? `Dự báo sắp có mưa (${weather.rainProbability}%): Tạm hoãn tưới nước để chống ngập úng, tránh thối gốc dưa.`
-                  : weather.condition === 'sunny'
-                    ? `Trời nắng đẹp: Cây quang hợp tốt, dưa đang tích lũy độ ngọt (Brix) thuận lợi.`
-                    : `Thời tiết thuận lợi: Giữ ẩm bầu dưa theo lịch tưới nhỏ giọt đều đặn.`}
+                  : !weather.isDay
+                    ? `Trời về đêm (${weather.temperature}°C): Cây ngừng quang hợp và chuyển sang hô hấp tích lũy đường. Giữ khô ráo mặt lá, không tưới muộn để phòng ngừa nấm rỉ sắt.`
+                    : weather.condition === 'sunny'
+                      ? `Trời nắng đẹp: Cây quang hợp tốt, dưa đang tích lũy độ ngọt (Brix) thuận lợi.`
+                      : `Thời tiết mát mẻ: Giữ ẩm bầu dưa theo lịch tưới nhỏ giọt đều đặn.`}
               </Text>
             </View>
           </View>
@@ -506,6 +596,75 @@ export default function DashboardScreen() {
                 </View>
               )}
             </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Modal Chọn Khu Vực Nông Trại Thời Tiết */}
+      <Modal
+        visible={isLocationModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsLocationModalOpen(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setIsLocationModalOpen(false)}
+        >
+          <Pressable style={styles.locationModalContent} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.locationModalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs + 2, flex: 1 }}>
+                <MapPin size={20} color={colors.primary[600]} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.locationModalTitle}>Chọn Khu Vực Nông Trại</Text>
+                  <Text style={styles.locationModalSubtitle}>
+                    Open-Meteo tự động dự báo thời tiết theo tọa độ từng địa phương
+                  </Text>
+                </View>
+              </View>
+              <Pressable
+                onPress={() => setIsLocationModalOpen(false)}
+                style={styles.modalCloseBtn}
+                hitSlop={8}
+              >
+                <X size={18} color={colors.textMuted} />
+              </Pressable>
+            </View>
+
+            <ScrollView
+              style={{ maxHeight: 380 }}
+              showsVerticalScrollIndicator={true}
+            >
+              {VIETNAM_FARM_LOCATIONS.map((loc) => {
+                const isSelected = currentLocation.id === loc.id;
+                return (
+                  <Pressable
+                    key={loc.id}
+                    style={[
+                      styles.locationItem,
+                      isSelected && styles.locationItemActive,
+                    ]}
+                    onPress={() => handleSelectLocation(loc)}
+                  >
+                    <View style={styles.locationItemLeft}>
+                      <Text style={[styles.locationItemName, isSelected && styles.locationItemNameActive]}>
+                        {loc.name}
+                      </Text>
+                      <Text style={styles.locationItemRegion}>{loc.region}</Text>
+                    </View>
+                    {isSelected && (
+                      <Check size={18} color={colors.primary[600]} strokeWidth={2.5} />
+                    )}
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+
+            <View style={styles.locationModalFooter}>
+              <Text style={styles.locationFooterNote}>
+                💡 API Open-Meteo hoàn toàn miễn phí, không cần đăng ký API key và tự động đồng bộ nhiệt ẩm theo thời gian thực.
+              </Text>
+            </View>
           </Pressable>
         </Pressable>
       </Modal>
@@ -993,4 +1152,114 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     lineHeight: 16,
   },
+  nightAdvisoryBox: {
+    backgroundColor: '#EEF2FF',
+    borderColor: '#C7D2FE',
+  },
+  weatherCityPressable: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  weatherChangeHint: {
+    fontSize: 11,
+    fontFamily: 'Inter-Medium',
+    color: colors.primary[600],
+    textDecorationLine: 'underline',
+  },
+  weatherBadgeNight: {
+    backgroundColor: 'rgba(99, 102, 241, 0.12)',
+  },
+  weatherBadgeTextNight: {
+    color: '#4F46E5',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.base,
+  },
+  locationModalContent: {
+    width: '100%',
+    maxWidth: 440,
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    padding: spacing.base,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...shadows.card,
+  },
+  locationModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    paddingBottom: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    marginBottom: spacing.xs,
+  },
+  locationModalTitle: {
+    fontSize: 15,
+    fontFamily: 'Inter-Bold',
+    color: colors.text,
+  },
+  locationModalSubtitle: {
+    fontSize: 11,
+    fontFamily: 'Inter-Regular',
+    color: colors.textMuted,
+    marginTop: 2,
+  },
+  modalCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  locationItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.sm + 2,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  locationItemActive: {
+    backgroundColor: 'rgba(45, 106, 79, 0.08)',
+  },
+  locationItemLeft: {
+    flex: 1,
+  },
+  locationItemName: {
+    fontSize: 14,
+    fontFamily: 'Inter-SemiBold',
+    color: colors.text,
+    marginBottom: 2,
+  },
+  locationItemNameActive: {
+    color: colors.primary[700],
+    fontFamily: 'Inter-Bold',
+  },
+  locationItemRegion: {
+    fontSize: 11,
+    fontFamily: 'Inter-Regular',
+    color: colors.textMuted,
+  },
+  locationModalFooter: {
+    marginTop: spacing.sm,
+    paddingTop: spacing.xs + 2,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  locationFooterNote: {
+    fontSize: 11,
+    fontFamily: 'Inter-Regular',
+    color: colors.textMuted,
+    lineHeight: 16,
+  },
 });
+
