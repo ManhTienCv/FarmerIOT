@@ -100,11 +100,20 @@ function mapWmoCode(
     : { description: 'Đêm nhiều mây', condition: 'cloudy_night' };
 }
 
+// ============================================================
+// BỘ ĐỆM CACHE THỜI TIẾT (Tránh bắn request liên tục mỗi vài giây)
+// ============================================================
+let cachedWeather: OutdoorWeather | null = null;
+let lastWeatherFetchTime = 0;
+let cachedLocationKey = '';
+const WEATHER_CACHE_TTL_MS = 10 * 60 * 1000; // 10 phút
+
 // Lấy thời tiết từ Open-Meteo API
 export async function getOutdoorWeather(
   latitude?: number,
   longitude?: number,
-  locationName?: string
+  locationName?: string,
+  forceRefresh = false
 ): Promise<OutdoorWeather> {
   let lat = latitude;
   let lon = longitude;
@@ -117,10 +126,28 @@ export async function getOutdoorWeather(
     name = saved.name;
   }
 
+  const locKey = `${lat.toFixed(3)},${lon.toFixed(3)}`;
+  const now = Date.now();
+
+  // Nếu còn hạn bộ đệm cache (< 10 phút), cùng địa điểm và không bị ép làm mới
+  if (
+    !forceRefresh &&
+    cachedWeather &&
+    cachedLocationKey === locKey &&
+    now - lastWeatherFetchTime < WEATHER_CACHE_TTL_MS
+  ) {
+    return cachedWeather;
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 6000);
+
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,is_day&hourly=precipitation_probability&forecast_days=2&timezone=Asia%2FBangkok`;
 
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(6000) });
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeoutId);
+
     if (!res.ok) {
       throw new Error(`HTTP error ${res.status}`);
     }
@@ -140,7 +167,7 @@ export async function getOutdoorWeather(
 
     const { description, condition } = mapWmoCode(current.weather_code ?? 0, isDay);
 
-    return {
+    const result: OutdoorWeather = {
       temperature: Math.round((current.temperature_2m ?? 28) * 10) / 10,
       humidity: Math.round(current.relative_humidity_2m ?? 70),
       weatherCode: current.weather_code ?? 0,
@@ -152,8 +179,20 @@ export async function getOutdoorWeather(
       locationName: name,
       updatedAt: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
     };
+
+    cachedWeather = result;
+    cachedLocationKey = locKey;
+    lastWeatherFetchTime = now;
+    return result;
   } catch (error) {
+    clearTimeout(timeoutId);
     console.warn('Không thể lấy thời tiết Open-Meteo, dùng dữ liệu dự phòng:', error);
+
+    // Nếu từng có cache trước đó cho vị trí này thì dùng lại thay vì sinh dữ liệu mẫu
+    if (cachedWeather && cachedLocationKey === locKey) {
+      return cachedWeather;
+    }
+
     const currentHour = new Date().getHours();
     const isDay = currentHour >= 6 && currentHour < 18;
     return {
@@ -170,3 +209,4 @@ export async function getOutdoorWeather(
     };
   }
 }
+

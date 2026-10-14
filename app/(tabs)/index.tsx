@@ -67,7 +67,7 @@ export default function DashboardScreen() {
       const [s, h, w] = await Promise.all([
         getSensors(),
         getSensorHistory(selected, 12),
-        getOutdoorWeather(targetLoc.latitude, targetLoc.longitude, targetLoc.name).catch(() => null),
+        getOutdoorWeather(targetLoc.latitude, targetLoc.longitude, targetLoc.name, isRefresh || !!loc).catch(() => null),
       ]);
       setSensors(s);
       setHistory(h);
