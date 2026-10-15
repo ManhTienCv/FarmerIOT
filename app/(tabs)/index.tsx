@@ -660,11 +660,6 @@ export default function DashboardScreen() {
               })}
             </ScrollView>
 
-            <View style={styles.locationModalFooter}>
-              <Text style={styles.locationFooterNote}>
-                💡 API Open-Meteo hoàn toàn miễn phí, không cần đăng ký API key và tự động đồng bộ nhiệt ẩm theo thời gian thực.
-              </Text>
-            </View>
           </Pressable>
         </Pressable>
       </Modal>
