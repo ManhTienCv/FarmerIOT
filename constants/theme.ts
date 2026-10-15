@@ -79,14 +79,14 @@ export const radius = {
 } as const;
 
 export const typography = {
-  title: { fontFamily: 'Inter-Bold', fontSize: 28, lineHeight: 34 },
-  h1: { fontFamily: 'Inter-Bold', fontSize: 24, lineHeight: 30 },
-  h2: { fontFamily: 'Inter-SemiBold', fontSize: 20, lineHeight: 26 },
-  h3: { fontFamily: 'Inter-SemiBold', fontSize: 17, lineHeight: 23 },
-  body: { fontFamily: 'Inter-Regular', fontSize: 15, lineHeight: 22 },
-  bodySm: { fontFamily: 'Inter-Regular', fontSize: 13, lineHeight: 18 },
-  caption: { fontFamily: 'Inter-Medium', fontSize: 12, lineHeight: 16 },
-  bigNumber: { fontFamily: 'Inter-Bold', fontSize: 34, lineHeight: 38 },
+  title: { fontFamily: 'Inter-Bold', fontSize: 25, lineHeight: 31 },
+  h1: { fontFamily: 'Inter-Bold', fontSize: 21.5, lineHeight: 27 },
+  h2: { fontFamily: 'Inter-SemiBold', fontSize: 18, lineHeight: 23 },
+  h3: { fontFamily: 'Inter-SemiBold', fontSize: 15.5, lineHeight: 21 },
+  body: { fontFamily: 'Inter-Regular', fontSize: 13.5, lineHeight: 20 },
+  bodySm: { fontFamily: 'Inter-Regular', fontSize: 11.5, lineHeight: 16 },
+  caption: { fontFamily: 'Inter-Medium', fontSize: 11, lineHeight: 15 },
+  bigNumber: { fontFamily: 'Inter-Bold', fontSize: 30, lineHeight: 34 },
 } as const;
 
 export const shadows = {

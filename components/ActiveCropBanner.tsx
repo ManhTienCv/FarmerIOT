@@ -1,11 +1,10 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import {
   Layers,
   Sparkles,
   Calendar,
   Info,
-  SlidersHorizontal,
   Plus,
   Minus,
   RotateCcw,
@@ -77,9 +76,9 @@ export default function ActiveCropBanner({ onPressManage }: ActiveCropBannerProp
         <View style={styles.progressSection}>
           <View style={styles.progressHeader}>
             <View style={styles.progressTitleWrap}>
-              <Calendar size={13} color={colors.primary[500]} />
+              <Calendar size={12} color={colors.primary[500]} />
               <Text style={styles.progressLabel}>
-                Tiến độ: <Text style={styles.progressValue}>Ngày {dayOfCrop}</Text> / {selectedCrop.totalDays} ({progressPercent}%)
+                Ngày <Text style={styles.progressValue}>{dayOfCrop}</Text>/{selectedCrop.totalDays} ({progressPercent}%)
               </Text>
             </View>
 
@@ -90,21 +89,21 @@ export default function ActiveCropBanner({ onPressManage }: ActiveCropBannerProp
                 hitSlop={6}
               >
                 <RotateCcw size={10} color={colors.primary[600]} />
-                <Text style={styles.resetCropBtnText}>Vụ mới (Ngày 1)</Text>
+                <Text style={styles.resetCropBtnText}>Vụ mới</Text>
               </Pressable>
               <Pressable
                 onPress={() => setDayOfCrop(dayOfCrop - 1)}
                 style={styles.dayStepBtn}
                 hitSlop={8}
               >
-                <Minus size={12} color={colors.textMuted} />
+                <Minus size={11} color={colors.text} />
               </Pressable>
               <Pressable
                 onPress={() => setDayOfCrop(dayOfCrop + 1)}
                 style={styles.dayStepBtn}
                 hitSlop={8}
               >
-                <Plus size={12} color={colors.textMuted} />
+                <Plus size={11} color={colors.text} />
               </Pressable>
             </View>
           </View>
@@ -292,14 +291,17 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: spacing.xs + 2,
+    flexWrap: 'nowrap',
+    gap: 4,
   },
   progressTitleWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
+    flexShrink: 1,
   },
   progressLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontFamily: 'Inter-Medium',
     color: colors.textMuted,
   },
@@ -310,28 +312,29 @@ const styles = StyleSheet.create({
   dayControls: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
+    flexShrink: 0,
   },
   resetCropBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
     backgroundColor: 'rgba(45, 106, 79, 0.08)',
     borderWidth: 1,
     borderColor: 'rgba(45, 106, 79, 0.22)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2.5,
     borderRadius: radius.pill,
   },
   resetCropBtnText: {
-    fontSize: 10,
+    fontSize: 9.5,
     fontFamily: 'Inter-SemiBold',
     color: colors.primary[700],
   },
   dayStepBtn: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',

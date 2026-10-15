@@ -72,7 +72,7 @@ export default function DashboardScreen() {
       setSensors(s);
       setHistory(h);
       if (w) setWeather(w);
-    } catch (e) {
+    } catch {
       // lỗi mạng – giữ dữ liệu cũ
     } finally {
       setLoading(false);
@@ -235,42 +235,39 @@ export default function DashboardScreen() {
 
         {/* Khung Thông Báo Dự Báo Thời Tiết & Khuyến Nghị Tưới Tự Động */}
         {weather && (
-          <View style={styles.weatherBanner}>
+          <View style={[styles.weatherBanner, !weather.isDay && styles.weatherBannerNight]}>
             <View style={styles.weatherTopRow}>
               <View style={styles.weatherLeft}>
                 <View
                   style={[
                     styles.weatherIconCircle,
-                    {
-                      backgroundColor:
-                        weather.rainProbability >= 60 || weather.condition === 'rainy'
-                          ? '#E0F2FE'
-                          : weather.condition === 'stormy'
-                            ? '#FEF3C7'
-                            : !weather.isDay
-                              ? '#EEF2FF'
-                              : weather.condition === 'sunny'
+                    !weather.isDay
+                      ? styles.weatherIconCircleNight
+                      : {
+                          backgroundColor:
+                            weather.rainProbability >= 60 || weather.condition === 'rainy'
+                              ? '#E0F2FE'
+                              : weather.condition === 'stormy'
                                 ? '#FEF3C7'
-                                : 'rgba(45,106,79,0.1)',
-                    },
+                                : weather.condition === 'sunny'
+                                  ? '#FEF3C7'
+                                  : 'rgba(45,106,79,0.1)',
+                        },
                   ]}
                 >
-                  {weather.rainProbability >= 60 || weather.condition === 'rainy' ? (
+                  {!weather.isDay ? (
+                    <MoonStar size={20} color="#818CF8" strokeWidth={2.2} />
+                  ) : weather.rainProbability >= 60 || weather.condition === 'rainy' ? (
                     <CloudRain size={20} color={colors.water[500]} strokeWidth={2.2} />
                   ) : weather.condition === 'stormy' ? (
                     <CloudLightning size={20} color="#D97706" strokeWidth={2.2} />
-                  ) : !weather.isDay ? (
-                    weather.condition === 'clear_night' ? (
-                      <MoonStar size={20} color="#6366F1" strokeWidth={2.2} />
-                    ) : (
-                      <CloudMoon size={20} color="#818CF8" strokeWidth={2.2} />
-                    )
                   ) : weather.condition === 'sunny' ? (
                     <Sun size={20} color={colors.sun[500]} strokeWidth={2.2} />
                   ) : (
                     <CloudSun size={20} color={colors.primary[500]} strokeWidth={2.2} />
                   )}
                 </View>
+
                 <View style={styles.weatherTextWrap}>
                   <View style={styles.weatherCityRow}>
                     <Pressable
@@ -278,9 +275,13 @@ export default function DashboardScreen() {
                       onPress={() => setIsLocationModalOpen(true)}
                       hitSlop={6}
                     >
-                      <MapPin size={13} color={colors.primary[600]} />
-                      <Text style={styles.weatherCityText}>{weather.locationName}</Text>
-                      <Text style={styles.weatherChangeHint}>(Đổi)</Text>
+                      <MapPin size={13} color={!weather.isDay ? '#A5B4FC' : colors.primary[600]} />
+                      <Text style={[styles.weatherCityText, !weather.isDay && styles.weatherCityTextNight]}>
+                        {weather.locationName}
+                      </Text>
+                      <Text style={[styles.weatherChangeHint, !weather.isDay && styles.weatherChangeHintNight]}>
+                        (Đổi)
+                      </Text>
                     </Pressable>
                     <View
                       style={[
@@ -298,7 +299,13 @@ export default function DashboardScreen() {
                       </Text>
                     </View>
                   </View>
-                  <Text style={styles.weatherDesc} numberOfLines={1}>
+                  <Text
+                    style={[
+                      styles.weatherDesc,
+                      !weather.isDay && styles.weatherDescNight,
+                    ]}
+                    numberOfLines={1}
+                  >
                     {weather.weatherDescription} · Xác suất mưa: {weather.rainProbability}%
                   </Text>
                 </View>
@@ -319,12 +326,17 @@ export default function DashboardScreen() {
                 {weather.rainProbability >= 60 ? (
                   <ShieldAlert size={14} color="#D97706" />
                 ) : !weather.isDay ? (
-                  <MoonStar size={14} color="#6366F1" />
+                  <MoonStar size={14} color="#818CF8" />
                 ) : (
                   <Sparkles size={14} color={colors.primary[600]} />
                 )}
               </View>
-              <Text style={styles.irrigationAdvisoryText}>
+              <Text
+                style={[
+                  styles.irrigationAdvisoryText,
+                  !weather.isDay && styles.irrigationAdvisoryTextNight,
+                ]}
+              >
                 {weather.rainProbability >= 60
                   ? `Dự báo sắp có mưa (${weather.rainProbability}%): Tạm hoãn tưới nước để chống ngập úng, tránh thối gốc dưa.`
                   : !weather.isDay
@@ -1148,8 +1160,27 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   nightAdvisoryBox: {
-    backgroundColor: '#EEF2FF',
-    borderColor: '#C7D2FE',
+    backgroundColor: 'rgba(49, 46, 129, 0.55)',
+    borderColor: '#4338CA',
+  },
+  weatherBannerNight: {
+    backgroundColor: '#1E1B4B',
+    borderColor: '#3730A3',
+  },
+  weatherIconCircleNight: {
+    backgroundColor: 'rgba(99, 102, 241, 0.3)',
+  },
+  weatherCityTextNight: {
+    color: '#FFFFFF',
+  },
+  weatherChangeHintNight: {
+    color: '#A5B4FC',
+  },
+  weatherDescNight: {
+    color: '#C7D2FE',
+  },
+  irrigationAdvisoryTextNight: {
+    color: '#EEF2FF',
   },
   weatherCityPressable: {
     flexDirection: 'row',
@@ -1163,10 +1194,10 @@ const styles = StyleSheet.create({
     textDecorationLine: 'underline',
   },
   weatherBadgeNight: {
-    backgroundColor: 'rgba(99, 102, 241, 0.12)',
+    backgroundColor: 'rgba(99, 102, 241, 0.25)',
   },
   weatherBadgeTextNight: {
-    color: '#4F46E5',
+    color: '#A5B4FC',
   },
   modalOverlay: {
     flex: 1,

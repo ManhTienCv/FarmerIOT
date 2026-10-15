@@ -22,6 +22,37 @@ export interface AIAnalysisResult {
 const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY || '';
 const GROQ_API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY || '';
 
+// Hàm đảm bảo nội dung luôn hiển thị 100% Tiếng Việt thuần nông học
+function ensureVietnamese(text: string): string {
+  if (!text) return '';
+  return text
+    .replace(/Soil moisture low/gi, 'Độ ẩm đất thấp')
+    .replace(/Soil moisture high/gi, 'Độ ẩm đất quá cao')
+    .replace(/Soil moisture at/gi, 'Độ ẩm đất ở mức')
+    .replace(/below optimal/gi, 'thấp hơn ngưỡng tối ưu')
+    .replace(/above optimal/gi, 'cao hơn ngưỡng tối ưu')
+    .replace(/risking water stress/gi, 'nguy cơ dưa lưới bị sốc thiếu nước')
+    .replace(/during high VPD/gi, 'khi áp lực bốc hơi VPD cao')
+    .replace(/Activate irrigation pump to raise soil moisture to ([\d-]+)% immediately\.?/gi, 'Bật máy bơm tưới nhỏ giọt nâng độ ẩm đất lên $1% ngay lập tức.')
+    .replace(/Activate irrigation pump/gi, 'Bật máy bơm tưới nhỏ giọt')
+    .replace(/Light intensity excessive/gi, 'Cường độ ánh sáng quá cao')
+    .replace(/Light intensity low/gi, 'Thiếu hụt ánh sáng quang hợp')
+    .replace(/Ambient light/gi, 'Ánh sáng môi trường')
+    .replace(/exceeds optimal/gi, 'vượt ngưỡng tối ưu')
+    .replace(/causing high VPD and potential heat stress/gi, 'làm tăng VPD và có nguy cơ gây sốc nhiệt cho lá dưa')
+    .replace(/Shade with black net or reduce LED output to bring light below ([\d,]+) lux\.?/gi, 'Kéo lưới đen che bớt nắng hoặc tắt bớt đèn quang hợp để duy trì dưới $1 lux.')
+    .replace(/High VPD risk/gi, 'Nguy cơ bốc thoát hơi nước cao (VPD cao)')
+    .replace(/Low VPD risk/gi, 'Nguy cơ đình trệ thoát hơi nước (VPD thấp)')
+    .replace(/indicates high evaporative demand/gi, 'cho thấy nhu cầu thoát hơi nước cao')
+    .replace(/combined with low soil moisture/gi, 'kết hợp với độ ẩm đất thấp')
+    .replace(/plants may suffer water stress/gi, 'cây dưa có nguy cơ héo rũ và cháy mép lá')
+    .replace(/Increase irrigation frequency and consider temporary shade to lower VPD\.?/gi, 'Tăng cữ tưới nhỏ giọt và kéo lưới che giảm nắng để hạ chỉ số VPD về mức an toàn.')
+    .replace(/Temperature high/gi, 'Nhiệt độ môi trường cao')
+    .replace(/Temperature low/gi, 'Nhiệt độ môi trường thấp')
+    .replace(/High humidity risk/gi, 'Độ ẩm không khí quá cao (Nguy cơ nấm)')
+    .replace(/Optimal environment/gi, 'Môi trường sinh thái lý tưởng');
+}
+
 // Tạo System Prompt chuyên gia nông nghiệp bám sát từng giống cây trồng & thời tiết
 function buildPrompt(
   sensors: SensorReading[],
@@ -81,16 +112,20 @@ YÊU CẦU CHẨN ĐOÁN VÀ RA QUYẾT ĐỊNH NÔNG HỌC CHUYÊN SÂU DƯA L�
    - MỌI KHUYẾN NGHỊ HÀNH ĐỘNG chỉ được đề xuất: Bật/tắt máy bơm tưới nước, Bật/tắt đèn quang hợp, hoặc thao tác thủ công nông hộ (kéo lưới đen che bớt nắng, cuộn mở rèm lưới đón gió tự nhiên, tưới ướt lối đi/nền nhà màng để bốc hơi tạo ẩm tự nhiên). TUYỆT ĐỐI KHÔNG khuyến nghị phun sương hay cấp ẩm bằng máy.
 6. Đưa ra từ 2 đến 4 khuyến nghị hành động thiết thực, ngắn gọn và có tính ứng dụng cao.
 
+QUY ĐỊNH NGÔN NGỮ (BẮT BUỘC TUYỆT ĐỐI):
+- 100% TOÀN BỘ NỘI DUNG (title, description, recommendation) BẮT BUỘC PHẢI VIẾT BẰNG TIẾNG VIỆT CHUẨN XÁC, DỄ HIỂU CHO BÀ CON NÔNG DÂN VIỆT NAM.
+- TUYỆT ĐỐI KHÔNG DÙNG BẤT KỲ TỪ TIẾNG ANH NÀO TRONG TITLE, DESCRIPTION VÀ RECOMMENDATION.
+
 BẮT BUỘC TRẢ VỀ ĐÚNG ĐỊNH DẠNG JSON SAU (không thêm markdown ngoài JSON):
 {
   "insights": [
     {
       "id": "1",
-      "title": "Tiêu đề ngắn dưới 7 từ",
-      "description": "Giải thích nguyên nhân sinh học và hiện trạng (1-2 câu ngắn)",
+      "title": "Tiêu đề tiếng Việt ngắn dưới 7 từ",
+      "description": "Giải thích tiếng Việt nguyên nhân sinh học và hiện trạng (1-2 câu ngắn)",
       "level": "danger" | "warning" | "success" | "info",
       "confidence": 92,
-      "recommendation": "Khuyến nghị hành động cụ thể cho nông dân (1-2 câu)"
+      "recommendation": "Khuyến nghị hành động tiếng Việt cụ thể cho nông dân (1-2 câu)"
     }
   ]
 }`;
@@ -131,11 +166,11 @@ async function callGemini(prompt: string): Promise<AIInsight[]> {
     const now = new Date().toISOString();
     return parsed.insights.map((item: any, idx: number) => ({
       id: item.id || `gemini-${idx + 1}`,
-      title: String(item.title || 'Khuyến nghị Nông học'),
-      description: String(item.description || ''),
+      title: ensureVietnamese(String(item.title || 'Khuyến nghị Nông học')),
+      description: ensureVietnamese(String(item.description || '')),
       level: (['danger', 'warning', 'success', 'info'].includes(item.level) ? item.level : 'info') as any,
       confidence: typeof item.confidence === 'number' ? item.confidence : 90,
-      recommendation: String(item.recommendation || ''),
+      recommendation: ensureVietnamese(String(item.recommendation || '')),
       createdAt: now,
     }));
   }
@@ -175,11 +210,11 @@ async function callGroq(prompt: string): Promise<AIInsight[]> {
     const now = new Date().toISOString();
     return parsed.insights.map((item: any, idx: number) => ({
       id: item.id || `groq-${idx + 1}`,
-      title: String(item.title || 'Khuyến nghị Nông học'),
-      description: String(item.description || ''),
+      title: ensureVietnamese(String(item.title || 'Khuyến nghị Nông học')),
+      description: ensureVietnamese(String(item.description || '')),
       level: (['danger', 'warning', 'success', 'info'].includes(item.level) ? item.level : 'info') as any,
       confidence: typeof item.confidence === 'number' ? item.confidence : 85,
-      recommendation: String(item.recommendation || ''),
+      recommendation: ensureVietnamese(String(item.recommendation || '')),
       createdAt: now,
     }));
   }
